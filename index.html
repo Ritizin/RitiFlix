@@ -822,15 +822,15 @@ async function fillFormFromTmdb(result, formPrefix) {
     const poster = tmdbPosterUrl(details.poster_path);
     const backdrop = tmdbPosterUrl(details.backdrop_path, true);
     const genres = tmdbGenreNames(details.genres||[]);
-    if (isMovie && !genres.includes('Filme')) genres.unshift('Filme');
-    else if (!isMovie && !genres.includes('Série')) genres.unshift('Série');
     const episodes = isMovie ? 1 : (details.number_of_episodes || 1);
     const status = (details.status === 'Ended' || details.status === 'Released' || details.status === 'Canceled') ? 'Completo' : 'Em andamento';
     const P = formPrefix;
     const set = (id,val) => { const el=document.getElementById(P+id); if(el) el.value=val; };
     const setChecked = (id,val) => { const el=document.getElementById(P+id); if(el) el.checked=val; };
     set('Title',title); set('Desc',desc); set('Year',year); set('Score',score);
+    set('Type', isMovie ? 'filme' : 'serie');
     set('Eps',episodes); set('Status',status); set('Genres',genres.join(', '));
+    toggleTypeFields(P);
     if (poster) {
       set('Poster',poster);
       const prev=document.getElementById(P+'PosterPrev'), img=document.getElementById(P+'PosterImg');
@@ -877,6 +877,19 @@ function tmdbSearchBlockHTML() {
     </div>
     <div style="font-size:.71rem;color:var(--text3);margin-top:.5rem">Selecione um resultado para preencher automaticamente poster, sinopse, nota, gêneros e mais.</div>
   </div>`;
+}
+
+// Mostra/esconde campos do formulário conforme o Tipo selecionado (Filme vs Série)
+function toggleTypeFields(prefix) {
+  const type = document.getElementById(prefix+'Type')?.value || 'serie';
+  const epsGroup = document.getElementById(prefix+'EpsGroup');
+  const epsInput = document.getElementById(prefix+'Eps');
+  if (type === 'filme') {
+    if (epsGroup) epsGroup.style.display = 'none';
+    if (epsInput) epsInput.value = 1;
+  } else {
+    if (epsGroup) epsGroup.style.display = '';
+  }
 }
 
 // Busca trending TMDb para home (posters reais)
@@ -1073,9 +1086,9 @@ async function renderHome() {
     const animes = await getAnimes();
     animateCounters(animes);
     renderGrid('popularGrid', animes.filter(a => a.popular).slice(0, 8));
-    // filmes = tipo 'Filme' ou gênero 'Filme'
-    const movies = animes.filter(a => (a.genres||[]).includes('Filme') || a.type === 'filme').slice(0,8);
-    const series = animes.filter(a => (a.genres||[]).includes('Série') || a.type === 'serie').slice(0,8);
+    // filmes = type 'filme' (ou, para títulos antigos, gênero 'Filme')
+    const movies = animes.filter(isAnimeMovie).slice(0,8);
+    const series = animes.filter(a => !isAnimeMovie(a)).slice(0,8);
     renderGrid('moviesGrid', movies.length ? movies : animes.filter(a=>a.featured).slice(0,8));
     renderGrid('seriesGrid', series.length ? series : animes.slice(0,8));
     renderGrid('newReleasesGrid', animes.filter(a => a.new).slice(0, 8));
@@ -1108,7 +1121,9 @@ function renderGrid(id, animes) {
 }
 
 function animeCardHTML(a) {
-  const typeLabel = (a.genres||[]).includes('Filme') ? 'FILME' : (a.genres||[]).includes('Série') ? 'SÉRIE' : '';
+  const movie = isAnimeMovie(a);
+  const isSerie = a.type === 'serie' || (!a.type && (a.genres||[]).includes('Série'));
+  const typeLabel = movie ? 'FILME' : isSerie ? 'SÉRIE' : '';
   return `<div class="anime-card" onclick="navigate('detail',${a.id})">
     <div class="card-img">
       <div class="card-img-inner">${a.poster ? `<img src="${a.poster}" style="width:100%;height:100%;object-fit:cover">` : `<div class="card-placeholder">${a.emoji}</div>`}</div>
@@ -1168,8 +1183,8 @@ async function renderSearch(filter) {
   if (title) title.textContent = activeFilter === 'Todos' ? 'Explorar Títulos' : activeFilter;
   const searchQ = input ? input.value.trim() : '';
   if (searchQ) animes = animes.filter(a => a.title.toLowerCase().includes(searchQ.toLowerCase()));
-  if (activeFilter === 'Filmes') animes = animes.filter(a => (a.genres||[]).includes('Filme') || a.type === 'filme');
-  else if (activeFilter === 'Séries') animes = animes.filter(a => (a.genres||[]).includes('Série') || a.type === 'serie');
+  if (activeFilter === 'Filmes') animes = animes.filter(isAnimeMovie);
+  else if (activeFilter === 'Séries') animes = animes.filter(a => !isAnimeMovie(a));
   else if (activeFilter === 'Lançamentos') animes = animes.filter(a => a.new);
   else if (activeFilter === 'Populares') animes = animes.filter(a => a.popular);
   else if (!['Todos'].includes(activeFilter)) animes = animes.filter(a => (a.genres||[]).includes(activeFilter));
@@ -1211,7 +1226,7 @@ async function renderDetail(id) {
   document.getElementById('detailTags').innerHTML = anime.genres.map(g => `<span class="tag">${g}</span>`).join('');
   document.getElementById('detailMeta').innerHTML = `
     <div class="detail-meta-item">Status: <span>${anime.status}</span></div>
-    <div class="detail-meta-item">Episódios: <span>${anime.episodes}</span></div>
+    ${isAnimeMovie(anime) ? '' : `<div class="detail-meta-item">Episódios: <span>${anime.episodes}</span></div>`}
     <div class="detail-meta-item">Ano: <span>${anime.year}</span></div>`;
   document.getElementById('detailDesc').textContent = anime.desc || '';
   let userRating = 0;
@@ -1556,30 +1571,49 @@ async function renderAdminDashboard(el) {
   </div>`;
 }
 
+let adminAnimeFilter = 'Todos';
+function isAnimeMovie(a) { return a.type === 'filme' || (!a.type && (a.genres||[]).includes('Filme')); }
+
 async function renderAdminAnimes(el) {
-  const animes = await getAnimes();
+  const allAnimes = await getAnimes();
+  const totalMovies = allAnimes.filter(isAnimeMovie).length;
+  const totalSeries = allAnimes.length - totalMovies;
+  let animes = allAnimes;
+  if (adminAnimeFilter === 'Séries') animes = allAnimes.filter(a => !isAnimeMovie(a));
+  else if (adminAnimeFilter === 'Filmes') animes = allAnimes.filter(isAnimeMovie);
+  const tabs = [
+    { key: 'Todos', label: `Todos (${allAnimes.length})` },
+    { key: 'Séries', label: `📺 Séries (${totalSeries})` },
+    { key: 'Filmes', label: `🎬 Filmes (${totalMovies})` },
+  ];
   el.innerHTML = `
   <div class="admin-header-bar">
     <div class="admin-page-title">🎬 Títulos</div>
     <button class="btn btn-red" onclick="adminNav('addAnime',null)">+ Adicionar Título</button>
   </div>
+  <div style="display:flex;gap:.6rem;margin-bottom:1.25rem;flex-wrap:wrap">
+    ${tabs.map(t => `<button class="filter-btn${adminAnimeFilter===t.key?' active':''}" onclick="adminAnimeFilter='${t.key}';adminNav('animes',null)">${t.label}</button>`).join('')}
+  </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
-    ${animes.map(a => `
+    ${animes.length === 0 ? `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text3)">Nenhum título nesta categoria ainda.</div>` : animes.map(a => {
+    const movie = isAnimeMovie(a);
+    return `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='rgba(229,9,20,0.5)'" onmouseout="this.style.borderColor='var(--border)'">
       <div style="aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:3rem;position:relative;overflow:hidden">
         ${a.poster ? `<img src="${a.poster}" style="width:100%;height:100%;object-fit:cover">` : `<span style="opacity:.5">${a.emoji}</span>`}
+        <span style="position:absolute;top:.4rem;left:.4rem;background:rgba(7,9,15,0.85);color:${movie?'var(--gold2)':'#7dd3fc'};font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px;letter-spacing:.04em">${movie?'🎬 FILME':'📺 SÉRIE'}</span>
         ${a.featured ? '<span style="position:absolute;top:.4rem;right:.4rem;background:var(--grad);color:#07090f;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">⭐ DESTAQUE</span>' : ''}
       </div>
       <div style="padding:.75rem">
         <div style="font-weight:700;font-size:.9rem;margin-bottom:.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(a.title)}</div>
         <div style="font-size:.75rem;color:var(--text3);margin-bottom:.75rem">${a.status} • ${a.year}</div>
         <div style="display:flex;gap:.5rem">
-          <button class="btn btn-red" style="flex:1;font-size:.75rem;padding:.4rem" onclick="adminNav('seasons',null,${a.id})">📅 Temporadas</button>
+          <button class="btn btn-red" style="flex:1;font-size:.75rem;padding:.4rem" onclick="adminNav('seasons',null,${a.id})">${movie?'🎬 Vídeo':'📅 Temporadas'}</button>
           <button class="td-btn td-edit" onclick="event.stopPropagation();adminNav('editAnime',null,${a.id})" style="padding:.4rem .6rem;font-size:.75rem">✏️</button>
           <button class="td-btn td-del" onclick="event.stopPropagation();adminDeleteAnime(${a.id})" style="padding:.4rem .6rem;font-size:.75rem">🗑️</button>
         </div>
       </div>
-    </div>`).join('')}
+    </div>`;}).join('')}
   </div>`;
 }
 
@@ -1594,6 +1628,8 @@ async function adminEditAnime(id) {
   const { data: anime } = await sb.from('animes').select('*').eq('id', id).single();
   if (!anime) return;
   anime.genres = anime.genres || [];
+  // Compatibilidade com títulos antigos que ainda não tinham o campo "type" definido
+  const inferredType = anime.type || (anime.genres.includes('Filme') ? 'filme' : 'serie');
   const el = document.getElementById('adminContent');
   el.innerHTML = `
   <div class="admin-header-bar">
@@ -1601,8 +1637,16 @@ async function adminEditAnime(id) {
     <button class="btn btn-ghost" onclick="adminNav('animes',null)">← Títulos</button>
   </div>
   <div class="admin-form">
+    ${tmdbSearchBlockHTML()}
     <div class="admin-section-card">
       <div class="admin-section-title">Informações do título</div>
+      <div class="form-group">
+        <label class="form-label">Tipo de conteúdo *</label>
+        <select class="form-select" id="eType" onchange="toggleTypeFields('e')">
+          <option value="serie"${inferredType==='serie'?' selected':''}>📺 Série</option>
+          <option value="filme"${inferredType==='filme'?' selected':''}>🎬 Filme</option>
+        </select>
+      </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Título</label><input class="form-input" id="eTitle" value="${sanitize(anime.title)}"></div>
         <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="eEmoji" value="${anime.emoji}" style="font-size:1.5rem"></div>
@@ -1612,14 +1656,14 @@ async function adminEditAnime(id) {
       </div>
       <div class="form-group"><label class="form-label">Descrição</label><textarea class="form-textarea" id="eDesc">${sanitize(anime.description||'')}</textarea></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Status</label><select class="form-select" id="eStatus"><option${anime.status==='Em andamento'?' selected':''}>Em andamento</option><option${anime.status==='Completo'?' selected':''}>Completo</option><option${anime.status==='Hiato'?' selected':''}>Hiato</option></select></div>
-        <div class="form-group"><label class="form-label">Episódios</label><input type="number" class="form-input" id="eEps" value="${anime.episodes}"></div>
+        <div class="form-group" id="eStatusGroup"><label class="form-label">Status</label><select class="form-select" id="eStatus"><option${anime.status==='Em andamento'?' selected':''}>Em andamento</option><option${anime.status==='Completo'?' selected':''}>Completo</option><option${anime.status==='Hiato'?' selected':''}>Hiato</option></select></div>
+        <div class="form-group" id="eEpsGroup"><label class="form-label">Episódios</label><input type="number" class="form-input" id="eEps" value="${anime.episodes}"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-input" id="eYear" value="${anime.year}"></div>
         <div class="form-group"><label class="form-label">Nota (0-10)</label><input type="number" step=".1" class="form-input" id="eScore" value="${anime.score}"></div>
       </div>
-      <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="eGenres" value="${anime.genres.join(', ')}"></div>
+      <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="eGenres" value="${anime.genres.filter(g=>g!=='Filme'&&g!=='Série').join(', ')}"></div>
       <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="eFeatured"${anime.featured?' checked':''} style="accent-color:var(--gold)"> Em destaque</label>
         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="eNew"${anime.is_new?' checked':''} style="accent-color:var(--gold)"> Lançamento</label>
@@ -1628,16 +1672,20 @@ async function adminEditAnime(id) {
       <button class="btn btn-red" onclick="saveEditAnime(${id})">💾 Salvar alterações</button>
     </div>
   </div>`;
+  initTmdbSearch('e');
+  toggleTypeFields('e');
 }
 
 async function saveEditAnime(id) {
+  const type = document.getElementById('eType').value || 'serie';
   await sb.from('animes').update({
     title: sanitize(document.getElementById('eTitle').value.trim()),
+    type: type,
     emoji: document.getElementById('eEmoji').value,
     poster: document.getElementById('ePoster')?.value?.trim() || '',
     description: sanitize(document.getElementById('eDesc').value.trim()),
     status: document.getElementById('eStatus').value,
-    episodes: parseInt(document.getElementById('eEps').value) || 0,
+    episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('eEps').value) || 0),
     year: parseInt(document.getElementById('eYear').value) || 2020,
     score: parseFloat(document.getElementById('eScore').value) || 0,
     genres: document.getElementById('eGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
@@ -1656,8 +1704,16 @@ function renderAdminAddAnime(el) {
     <button class="btn btn-ghost" onclick="adminNav('animes',null)">← Voltar</button>
   </div>
   <div class="admin-form">
+    ${tmdbSearchBlockHTML()}
     <div class="admin-section-card">
       <div class="admin-section-title">Dados do título</div>
+      <div class="form-group">
+        <label class="form-label">Tipo de conteúdo *</label>
+        <select class="form-select" id="aType" onchange="toggleTypeFields('a')">
+          <option value="serie">📺 Série</option>
+          <option value="filme">🎬 Filme</option>
+        </select>
+      </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Título *</label><input class="form-input" id="aTitle" placeholder="Nome do filme/série"></div>
         <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="aEmoji" placeholder="🎬" value="🎬"></div>
@@ -1665,14 +1721,14 @@ function renderAdminAddAnime(el) {
       <div class="form-group"><label class="form-label">URL da Capa</label><input class="form-input" id="aPoster" placeholder="https://imagem.jpg"></div>
       <div class="form-group"><label class="form-label">Descrição *</label><textarea class="form-textarea" id="aDesc" placeholder="Sinopse..."></textarea></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Status</label><select class="form-select" id="aStatus"><option>Em andamento</option><option>Completo</option><option>Hiato</option></select></div>
-        <div class="form-group"><label class="form-label">Nº de Episódios</label><input type="number" class="form-input" id="aEps" value="1"></div>
+        <div class="form-group" id="aStatusGroup"><label class="form-label">Status</label><select class="form-select" id="aStatus"><option>Em andamento</option><option>Completo</option><option>Hiato</option></select></div>
+        <div class="form-group" id="aEpsGroup"><label class="form-label">Nº de Episódios</label><input type="number" class="form-input" id="aEps" value="1"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-input" id="aYear" value="2024"></div>
         <div class="form-group"><label class="form-label">Nota inicial (0-10)</label><input type="number" step=".1" class="form-input" id="aScore" value="8.0"></div>
       </div>
-      <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="aGenres" placeholder="Filme, Ação, Aventura"></div>
+      <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="aGenres" placeholder="Ação, Aventura"></div>
       <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem">
         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="aFeatured" style="accent-color:var(--gold)"> Em destaque</label>
         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="aNew" checked style="accent-color:var(--gold)"> Lançamento</label>
@@ -1681,19 +1737,23 @@ function renderAdminAddAnime(el) {
       <button class="btn btn-red" onclick="saveNewAnime()">✅ Publicar título</button>
     </div>
   </div>`;
+  initTmdbSearch('a');
+  toggleTypeFields('a');
 }
 
 async function saveNewAnime() {
   const title = document.getElementById('aTitle').value.trim();
   const desc = document.getElementById('aDesc').value.trim();
   if (!title || !desc) { showNotif('❌ Título e descrição são obrigatórios.', 'error'); return; }
+  const type = document.getElementById('aType').value || 'serie';
   const { error } = await sb.from('animes').insert({
     title: sanitize(title),
+    type: type,
     emoji: document.getElementById('aEmoji').value || '🎬',
     poster: document.getElementById('aPoster').value.trim(),
     genres: document.getElementById('aGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
     status: document.getElementById('aStatus').value,
-    episodes: parseInt(document.getElementById('aEps').value) || 1,
+    episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('aEps').value) || 1),
     year: parseInt(document.getElementById('aYear').value) || 2024,
     score: parseFloat(document.getElementById('aScore').value) || 8.0,
     description: sanitize(desc),
@@ -1702,7 +1762,7 @@ async function saveNewAnime() {
     popular: document.getElementById('aPopular').checked,
   });
   if (error) { showNotif('❌ Erro: ' + error.message, 'error'); return; }
-  showNotif('🎬 Título "' + sanitize(title) + '" publicado!', 'success');
+  showNotif((type==='filme'?'🎬':'📺') + ' Título "' + sanitize(title) + '" publicado!', 'success');
   adminNav('animes', null);
 }
 
