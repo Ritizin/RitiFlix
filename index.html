@@ -528,9 +528,9 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
   </div>
-  <div class="episodes-section">
+  <div class="episodes-section" id="episodesSection">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
-      <div class="section-title">Episódios</div>
+      <div class="section-title" id="episodesSectionTitle">Episódios</div>
       <select class="form-select" style="width:auto;padding:.4rem .85rem;font-size:.85rem" id="seasonSelect" onchange="renderEpisodes()">
         <option>Temporada 1</option>
       </select>
@@ -539,8 +539,6 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
- <iframe src="https://fembed.sx/e/533535" width="640" height="480" frameborder="0" allowfullscreen></iframe>
-  
 <!-- ===== PLAYER ===== -->
 <div id="page-player" class="page">
   <div class="player-wrap">
@@ -561,8 +559,8 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="player-btns">
           <button class="pbtn" onclick="togglePlay()" id="playPauseBtn">⏸</button>
-          <button class="pbtn" onclick="prevEp()">⏮</button>
-          <button class="pbtn" onclick="nextEp()">⏭</button>
+          <button class="pbtn" onclick="prevEp()" id="prevEpBtn">⏮</button>
+          <button class="pbtn" onclick="nextEp()" id="nextEpBtn">⏭</button>
           <span class="player-time" id="playerTime">00:00 / 45:00</span>
           <button class="pbtn" onclick="toggleFullscreen()">⛶</button>
         </div>
@@ -1245,10 +1243,17 @@ async function renderDetail(id) {
     favBtn.classList.toggle('active', !!fav);
     favBtn.textContent = fav ? '♥ Favoritado' : '♡ Favoritar';
   }
+  const movie = isAnimeMovie(anime);
+  const seasonSel = document.getElementById('seasonSelect');
+  const epTitle = document.getElementById('episodesSectionTitle');
+  if (seasonSel) seasonSel.style.display = movie ? 'none' : '';
+  if (epTitle) epTitle.textContent = movie ? 'Filme' : 'Episódios';
   renderEpisodes();
 }
 
 async function renderEpisodes() {
+  const { data: anime } = await sb.from('animes').select('type,genres').eq('id', currentAnimeId).single();
+  const movie = anime ? isAnimeMovie(anime) : false;
   const seasonSel = document.getElementById('seasonSelect');
   const selectedSeason = parseInt(seasonSel?.value?.replace('Temporada ','')) || 1;
   const { data: allEps } = await sb.from('episodes').select('season').eq('anime_id', currentAnimeId);
@@ -1263,14 +1268,14 @@ async function renderEpisodes() {
     .eq('anime_id', currentAnimeId).eq('season', activeSeason).order('num', { ascending: true });
   const grid = document.getElementById('epsGrid');
   if (!grid) return;
-  if (!eps || eps.length === 0) { grid.innerHTML = '<p style="color:var(--text3);font-size:.9rem">Nenhum episódio cadastrado ainda. Adicione pelo painel admin.</p>'; return; }
+  if (!eps || eps.length === 0) { grid.innerHTML = `<p style="color:var(--text3);font-size:.9rem">${movie ? 'Nenhum vídeo cadastrado ainda. Adicione pelo painel admin.' : 'Nenhum episódio cadastrado ainda. Adicione pelo painel admin.'}</p>`; return; }
   grid.innerHTML = eps.map(ep => `<div class="ep-card" onclick="navigate('player',{animeId:${ep.anime_id},epId:${ep.id}})">
     <div class="ep-thumb" style="${ep.thumbnail_url?'background:none':''}">
       ${ep.thumbnail_url ? `<img src="${ep.thumbnail_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : `<span style="font-size:1.5rem">🎬</span>`}
     </div>
     <div style="flex:1;min-width:0">
-      <div class="ep-num">EP. ${ep.num}</div>
-      <div class="ep-title">${sanitize(ep.title)}</div>
+      ${movie ? '' : `<div class="ep-num">EP. ${ep.num}</div>`}
+      <div class="ep-title">${movie ? '▶ Assistir filme' : sanitize(ep.title)}</div>
       <div class="ep-duration">⏱ ${ep.duration}</div>
     </div>
   </div>`).join('');
@@ -1328,10 +1333,15 @@ async function renderPlayer(data) {
   const { data: ep } = await sb.from('episodes').select('*').eq('id', epId).single();
   if (!anime || !ep) return;
   document.getElementById('playerEmoji').textContent = anime.emoji;
-  document.getElementById('playerTitle').textContent = anime.title + ' - Ep. ' + ep.num + ': ' + ep.title;
+  const movie = isAnimeMovie(anime);
+  document.getElementById('playerTitle').textContent = movie ? anime.title : (anime.title + ' - Ep. ' + ep.num + ': ' + ep.title);
   document.getElementById('playerAnimeTitle').textContent = anime.title;
-  document.getElementById('playerEpTitle').textContent = 'Episódio ' + ep.num + ': ' + ep.title + ' • ' + ep.duration;
-  document.getElementById('playerBreadcrumb').textContent = anime.title + ' > Ep. ' + ep.num;
+  document.getElementById('playerEpTitle').textContent = movie ? ('Filme • ' + ep.duration) : ('Episódio ' + ep.num + ': ' + ep.title + ' • ' + ep.duration);
+  document.getElementById('playerBreadcrumb').textContent = movie ? anime.title : (anime.title + ' > Ep. ' + ep.num);
+  const prevBtn = document.getElementById('prevEpBtn');
+  const nextBtn = document.getElementById('nextEpBtn');
+  if (prevBtn) prevBtn.style.display = movie ? 'none' : '';
+  if (nextBtn) nextBtn.style.display = movie ? 'none' : '';
   document.getElementById('playerContent').style.display = 'flex';
   document.getElementById('playerControls').style.display = 'none';
   document.getElementById('playerPlayBtn').textContent = '▶ Reproduzir';
