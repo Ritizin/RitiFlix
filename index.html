@@ -1264,7 +1264,7 @@ async function renderEpisodes() {
   if (!eps || eps.length === 0) { grid.innerHTML = '<p style="color:var(--text3);font-size:.9rem">Nenhum episódio cadastrado ainda. Adicione pelo painel admin.</p>'; return; }
   grid.innerHTML = eps.map(ep => `<div class="ep-card" onclick="navigate('player',{animeId:${ep.anime_id},epId:${ep.id}})">
     <div class="ep-thumb" style="${ep.thumbnail_url?'background:none':''}">
-      ${ep.thumbnail_url ? `<img src="${ep.thumbnail_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : `<span style="font-size:1.5rem">${ep.emoji}</span>`}
+      ${ep.thumbnail_url ? `<img src="${ep.thumbnail_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : `<span style="font-size:1.5rem">🎬</span>`}
     </div>
     <div style="flex:1;min-width:0">
       <div class="ep-num">EP. ${ep.num}</div>
@@ -1532,6 +1532,7 @@ function adminNav(section, el, extraId, extraId2) {
     addAnime: renderAdminAddAnime,
     editAnime: (el) => adminEditAnime(extraId),
     seasons: (el) => renderAdminSeasons(el, extraId),
+    movieVideo: (el) => renderAdminMovieVideo(el, extraId),
     episodes: (el) => renderAdminEpisodes(el, extraId, extraId2),
     addEp: (el) => renderAdminAddEp(el, extraId, extraId2),
     editEp: (el) => renderAdminEditEp(el, extraId),
@@ -1608,7 +1609,7 @@ async function renderAdminAnimes(el) {
         <div style="font-weight:700;font-size:.9rem;margin-bottom:.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(a.title)}</div>
         <div style="font-size:.75rem;color:var(--text3);margin-bottom:.75rem">${a.status} • ${a.year}</div>
         <div style="display:flex;gap:.5rem">
-          <button class="btn btn-red" style="flex:1;font-size:.75rem;padding:.4rem" onclick="adminNav('seasons',null,${a.id})">${movie?'🎬 Vídeo':'📅 Temporadas'}</button>
+          <button class="btn btn-red" style="flex:1;font-size:.75rem;padding:.4rem" onclick="adminNav('${movie?'movieVideo':'seasons'}',null,${a.id})">${movie?'🎬 Vídeo':'📅 Temporadas'}</button>
           <button class="td-btn td-edit" onclick="event.stopPropagation();adminNav('editAnime',null,${a.id})" style="padding:.4rem .6rem;font-size:.75rem">✏️</button>
           <button class="td-btn td-del" onclick="event.stopPropagation();adminDeleteAnime(${a.id})" style="padding:.4rem .6rem;font-size:.75rem">🗑️</button>
         </div>
@@ -1766,6 +1767,66 @@ async function saveNewAnime() {
   adminNav('animes', null);
 }
 
+// ------------------------------------------------------------
+// VÍDEO DO FILME (fluxo simplificado, só para títulos do tipo Filme)
+// ------------------------------------------------------------
+async function renderAdminMovieVideo(el, animeId) {
+  const { data: anime } = await sb.from('animes').select('*').eq('id', animeId).single();
+  if (!anime) { adminNav('animes', null); return; }
+  const { data: eps } = await sb.from('episodes').select('*').eq('anime_id', animeId).order('id', { ascending: true }).limit(1);
+  const ep = eps && eps.length > 0 ? eps[0] : null;
+  el.innerHTML = `
+  <div class="admin-header-bar">
+    <div>
+      <div style="font-size:.75rem;color:var(--text3);margin-bottom:.25rem;cursor:pointer" onclick="adminNav('animes',null)">← Títulos</div>
+      <div class="admin-page-title">${anime.emoji} ${sanitize(anime.title)}</div>
+    </div>
+  </div>
+  <div class="admin-form">
+    <div class="admin-section-card">
+      <div class="admin-section-title">🎬 Vídeo do filme</div>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.25rem">${ep && ep.video_url ? '<span style="color:#4ade80">✓ Este filme já tem um vídeo cadastrado.</span>' : 'Nenhum vídeo cadastrado ainda. Cole a URL abaixo para publicar.'}</div>
+      <div class="form-group"><label class="form-label">URL do vídeo *</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://..."></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Duração</label><input class="form-input" id="mvDur" value="${ep?.duration||'01:45:00'}" placeholder="01:45:00"></div>
+        <div class="form-group"><label class="form-label">URL da Miniatura (opcional)</label><input class="form-input" id="mvThumb" value="${ep?.thumbnail_url||''}" placeholder="https://imagem-thumb.jpg"></div>
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <button class="btn btn-red" onclick="saveMovieVideo(${animeId},${ep?ep.id:'null'})">✅ ${ep?'Salvar alterações':'Publicar vídeo'}</button>
+        ${ep ? `<button class="td-btn td-del" onclick="deleteMovieVideo(${ep.id},${animeId})">🗑️ Remover vídeo</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+async function saveMovieVideo(animeId, epId) {
+  const videoUrl = document.getElementById('mvUrl').value.trim();
+  if (!videoUrl) { showNotif('❌ Cole a URL do vídeo.', 'error'); return; }
+  const { data: anime } = await sb.from('animes').select('title, emoji').eq('id', animeId).single();
+  const payload = {
+    anime_id: animeId,
+    season: 1,
+    num: 1,
+    title: anime?.title || 'Filme',
+    duration: document.getElementById('mvDur').value.trim() || '01:45:00',
+    thumbnail_url: document.getElementById('mvThumb').value.trim(),
+    video_url: videoUrl,
+  };
+  const { error } = epId
+    ? await sb.from('episodes').update(payload).eq('id', epId)
+    : await sb.from('episodes').insert(payload);
+  if (error) { showNotif('❌ Erro: ' + error.message, 'error'); return; }
+  showNotif('✅ Vídeo do filme salvo!', 'success');
+  adminNav('animes', null);
+}
+
+async function deleteMovieVideo(epId, animeId) {
+  if (!confirm('Remover o vídeo deste filme?')) return;
+  await sb.from('episodes').delete().eq('id', epId);
+  showNotif('🗑️ Vídeo removido.', 'success');
+  adminNav('movieVideo', null, animeId);
+}
+
 async function renderAdminSeasons(el, animeId) {
   const { data: anime } = await sb.from('animes').select('*').eq('id', animeId).single();
   if (!anime) { adminNav('animes', null); return; }
@@ -1838,7 +1899,7 @@ async function renderAdminEpisodes(el, animeId, season) {
   </div>` : `<div style="display:flex;flex-direction:column;gap:.75rem">
     ${eps.map(e => `<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;transition:all .2s">
       <div style="width:100px;height:64px;border-radius:6px;background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.8rem;position:relative;overflow:hidden">
-        ${e.thumbnail_url ? `<img src="${e.thumbnail_url}" style="width:100%;height:100%;object-fit:cover">` : `<span style="opacity:.5">${e.emoji}</span>`}
+        ${e.thumbnail_url ? `<img src="${e.thumbnail_url}" style="width:100%;height:100%;object-fit:cover">` : `<span style="opacity:.5">🎬</span>`}
         <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(7,9,15,0.85);font-size:.6rem;font-weight:700;color:var(--text2);text-align:center;padding:.15rem">EP ${e.num}</div>
       </div>
       <div style="flex:1;min-width:0">
@@ -1885,7 +1946,6 @@ async function renderAdminAddEp(el, animeId, season) {
         <input class="form-input" id="epThumb" placeholder="https://imagem-thumb.jpg" oninput="var p=document.getElementById('epThumbPrev'),img=document.getElementById('epThumbImg');if(this.value){p.style.display='block';img.src=this.value;}else{p.style.display='none';}">
         <div id="epThumbPrev" style="margin-top:.5rem;display:none"><img id="epThumbImg" src="" style="width:120px;height:75px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
       </div>
-      <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="epEmoji" placeholder="🎬" value="🎬"></div>
       <div class="form-group"><label class="form-label">URL do vídeo (opcional)</label><input class="form-input" id="epUrl" placeholder="https://..."></div>
       <button class="btn btn-red" onclick="saveNewEp(${animeId||0},${season||1})">✅ Adicionar episódio</button>
     </div>
@@ -1912,7 +1972,6 @@ async function saveNewEp(backAnimeId, backSeason) {
   const { error } = await sb.from('episodes').insert({
     anime_id: animeId, num, title: sanitize(title),
     duration: document.getElementById('epDur').value || '45:00',
-    emoji: document.getElementById('epEmoji').value || '🎬',
     thumbnail_url: document.getElementById('epThumb')?.value?.trim() || '',
     season: season,
     video_url: document.getElementById('epUrl').value || ''
@@ -1946,7 +2005,6 @@ async function renderAdminEditEp(el, epId) {
         <input class="form-input" id="eeThumb" value="${ep.thumbnail_url||''}" placeholder="https://imagem-thumb.jpg" oninput="var p=document.getElementById('eeThumbPrev'),img=document.getElementById('eeThumbImg');if(this.value){p.style.display='block';img.src=this.value;}else{p.style.display='none';}">
         <div id="eeThumbPrev" style="margin-top:.5rem;${ep.thumbnail_url?'':'display:none'}"><img id="eeThumbImg" src="${ep.thumbnail_url||''}" style="width:120px;height:75px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
       </div>
-      <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="eeEmoji" value="${ep.emoji||'🎬'}"></div>
       <div class="form-group"><label class="form-label">URL do vídeo</label><input class="form-input" id="eeUrl" value="${ep.video_url||''}" placeholder="https://..."></div>
       <div style="display:flex;gap:.75rem;flex-wrap:wrap">
         <button class="btn btn-red" onclick="saveEditEp(${ep.id},${ep.anime_id})">💾 Salvar alterações</button>
@@ -1962,7 +2020,6 @@ async function saveEditEp(epId, animeId) {
     num: parseInt(document.getElementById('eeNum').value) || 1,
     title: sanitize(document.getElementById('eeTitle').value.trim()),
     duration: document.getElementById('eeDur').value || '45:00',
-    emoji: document.getElementById('eeEmoji').value || '🎬',
     thumbnail_url: document.getElementById('eeThumb').value.trim(),
     season: season,
     video_url: document.getElementById('eeUrl').value.trim(),
