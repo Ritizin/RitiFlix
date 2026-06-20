@@ -1317,12 +1317,21 @@ let isPlaying = false;
 function loadVideoUrl(videoUrl) {
   const container = document.getElementById('playerContent');
   if (!container) return;
-  container.innerHTML = '<video id="animePlayer" controls style="width:100%;max-height:70vh;background:#000"></video>';
-  const video = document.getElementById('animePlayer');
-  if (!videoUrl) return;
-  if (videoUrl.endsWith('.m3u8') && window.Hls && Hls.isSupported()) {
-    const hls = new Hls(); hls.loadSource(videoUrl); hls.attachMedia(video);
-  } else { video.src = videoUrl; }
+  if (!videoUrl) {
+    container.innerHTML = '<video id="animePlayer" controls style="width:100%;max-height:70vh;background:#000"></video>';
+    return;
+  }
+  const isDirectFile = /\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(videoUrl);
+  if (isDirectFile) {
+    container.innerHTML = '<video id="animePlayer" controls style="width:100%;max-height:70vh;background:#000"></video>';
+    const video = document.getElementById('animePlayer');
+    if (videoUrl.endsWith('.m3u8') && window.Hls && Hls.isSupported()) {
+      const hls = new Hls(); hls.loadSource(videoUrl); hls.attachMedia(video);
+    } else { video.src = videoUrl; }
+    return;
+  }
+  // URL de frame/embed (ex: https://fembed.sx/e/533535)
+  container.innerHTML = `<iframe src="${videoUrl}" style="width:100%;height:70vh;max-height:70vh;background:#000;border:none" allowfullscreen allow="autoplay; fullscreen; encrypted-media"></iframe>`;
 }
 
 async function renderPlayer(data) {
@@ -1798,7 +1807,7 @@ async function renderAdminMovieVideo(el, animeId) {
     <div class="admin-section-card">
       <div class="admin-section-title">🎬 Vídeo do filme</div>
       <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.25rem">${ep && ep.video_url ? '<span style="color:#4ade80">✓ Este filme já tem um vídeo cadastrado.</span>' : 'Nenhum vídeo cadastrado ainda. Cole a URL abaixo para publicar.'}</div>
-      <div class="form-group"><label class="form-label">URL do vídeo *</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://..."></div>
+      <div class="form-group"><label class="form-label">URL do vídeo *</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame, ex: https://fembed.sx/e/533535)"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Duração</label><input class="form-input" id="mvDur" value="${ep?.duration||'01:45:00'}" placeholder="01:45:00"></div>
         <div class="form-group"><label class="form-label">URL da Miniatura (opcional)</label><input class="form-input" id="mvThumb" value="${ep?.thumbnail_url||''}" placeholder="https://imagem-thumb.jpg"></div>
@@ -1958,7 +1967,7 @@ async function renderAdminAddEp(el, animeId, season) {
         <input class="form-input" id="epThumb" placeholder="https://imagem-thumb.jpg" oninput="var p=document.getElementById('epThumbPrev'),img=document.getElementById('epThumbImg');if(this.value){p.style.display='block';img.src=this.value;}else{p.style.display='none';}">
         <div id="epThumbPrev" style="margin-top:.5rem;display:none"><img id="epThumbImg" src="" style="width:120px;height:75px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
       </div>
-      <div class="form-group"><label class="form-label">URL do vídeo (opcional)</label><input class="form-input" id="epUrl" placeholder="https://..."></div>
+      <div class="form-group"><label class="form-label">URL do vídeo (opcional)</label><input class="form-input" id="epUrl" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame, ex: https://fembed.sx/e/533535)"></div>
       <button class="btn btn-red" onclick="saveNewEp(${animeId||0},${season||1})">✅ Adicionar episódio</button>
     </div>
   </div>`;
@@ -2017,7 +2026,7 @@ async function renderAdminEditEp(el, epId) {
         <input class="form-input" id="eeThumb" value="${ep.thumbnail_url||''}" placeholder="https://imagem-thumb.jpg" oninput="var p=document.getElementById('eeThumbPrev'),img=document.getElementById('eeThumbImg');if(this.value){p.style.display='block';img.src=this.value;}else{p.style.display='none';}">
         <div id="eeThumbPrev" style="margin-top:.5rem;${ep.thumbnail_url?'':'display:none'}"><img id="eeThumbImg" src="${ep.thumbnail_url||''}" style="width:120px;height:75px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
       </div>
-      <div class="form-group"><label class="form-label">URL do vídeo</label><input class="form-input" id="eeUrl" value="${ep.video_url||''}" placeholder="https://..."></div>
+      <div class="form-group"><label class="form-label">URL do vídeo</label><input class="form-input" id="eeUrl" value="${ep.video_url||''}" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame, ex: https://fembed.sx/e/533535)"></div>
       <div style="display:flex;gap:.75rem;flex-wrap:wrap">
         <button class="btn btn-red" onclick="saveEditEp(${ep.id},${ep.anime_id})">💾 Salvar alterações</button>
         <button class="btn btn-ghost" onclick="adminNav('episodes',null,${ep.anime_id},${ep.season||1})">Cancelar</button>
