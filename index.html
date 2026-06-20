@@ -322,10 +322,10 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .history-skeleton{height:84px;border-radius:12px;background:linear-gradient(90deg,var(--card) 25%,var(--bg3) 50%,var(--card) 75%);background-size:200% 100%;animation:skeleton-pulse 1.4s ease-in-out infinite}
 @keyframes skeleton-pulse{0%{background-position:200% 0}100%{background-position:-200% 0}}
 /* TOGGLE CHIPS (admin: popular / destaque / em alta) */
-.toggle-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}
+.toggle-chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
 .toggle-chip{position:relative}
 .toggle-chip input{position:absolute;opacity:0;width:0;height:0}
-.toggle-chip span{display:flex;align-items:center;gap:.45rem;padding:.55rem 1rem;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s;user-select:none}
+.toggle-chip span{display:flex;align-items:center;gap:.4rem;padding:.55rem .85rem;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;user-select:none;white-space:nowrap}
 .toggle-chip span .tc-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);transition:all .2s;flex-shrink:0}
 .toggle-chip input:checked + span{background:rgba(201,168,76,0.1);border-color:var(--gold);color:var(--gold2)}
 .toggle-chip input:checked + span .tc-dot{background:var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.6)}
@@ -1859,7 +1859,7 @@ async function adminEditAnime(id) {
           <label class="toggle-chip"><input type="checkbox" id="eNew"${anime.is_new?' checked':''}><span><span class="tc-dot"></span>🆕 Lançamento</span></label>
           <label class="toggle-chip"><input type="checkbox" id="ePopular"${anime.popular?' checked':''}><span><span class="tc-dot"></span>🔥 Populares</span></label>
           <label class="toggle-chip"><input type="checkbox" id="eTrending"${anime.trending?' checked':''}><span><span class="tc-dot"></span>📈 Em alta</span></label>
-          <label class="toggle-chip"><input type="checkbox" id="eRecommended"${anime.recommended?' checked':''}><span><span class="tc-dot"></span>🍿 Séries e Filmes</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="eRecommended"${anime.recommended?' checked':''}><span><span class="tc-dot"></span>🍿 Recomendados</span></label>
         </div>
         <div style="font-size:.72rem;color:var(--text3)">Controla em quais carrosséis da home este título aparece (Populares, Filmes em Alta, Séries em Alta, Séries e Filmes).</div>
       </div>
@@ -1934,7 +1934,7 @@ function renderAdminAddAnime(el) {
           <label class="toggle-chip"><input type="checkbox" id="aNew" checked><span><span class="tc-dot"></span>🆕 Lançamento</span></label>
           <label class="toggle-chip"><input type="checkbox" id="aPopular"><span><span class="tc-dot"></span>🔥 Populares</span></label>
           <label class="toggle-chip"><input type="checkbox" id="aTrending"><span><span class="tc-dot"></span>📈 Em alta</span></label>
-          <label class="toggle-chip"><input type="checkbox" id="aRecommended"><span><span class="tc-dot"></span>🍿 Séries e Filmes</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="aRecommended"><span><span class="tc-dot"></span>🍿 Recomendados</span></label>
         </div>
         <div style="font-size:.72rem;color:var(--text3)">Controla em quais carrosséis da home este título aparece (Populares, Filmes em Alta, Séries em Alta, Séries e Filmes).</div>
       </div>
