@@ -1282,7 +1282,7 @@ async function renderEpisodes() {
 }
 
 async function watchFirstEp() {
-  const { data: eps } = await sb.from('episodes').select('*').eq('anime_id', currentAnimeId).order('season',{ascending:true}).order('num',{ascending:true}).limit(1);
+  const { data: eps } = await sb.from('episodes').select('*').eq('anime_id', currentAnimeId).order('season',{ascending:true}).order('num',{ascending:true}).order('id',{ascending:true}).limit(1);
   if (eps && eps.length > 0) { navigate('player', { animeId: currentAnimeId, epId: eps[0].id }); }
   else { showNotif('Nenhum episódio disponível ainda.', 'error'); }
 }
@@ -1641,6 +1641,9 @@ async function renderAdminAnimes(el) {
 
 async function adminDeleteAnime(id) {
   if (!confirm('Excluir este título permanentemente?')) return;
+  await sb.from('episodes').delete().eq('anime_id', id);
+  await sb.from('favorites').delete().eq('anime_id', id);
+  await sb.from('ratings').delete().eq('anime_id', id);
   await sb.from('animes').delete().eq('id', id);
   showNotif('🗑️ Título excluído.', 'success');
   adminNav('animes', null);
@@ -1794,8 +1797,9 @@ async function saveNewAnime() {
 async function renderAdminMovieVideo(el, animeId) {
   const { data: anime } = await sb.from('animes').select('*').eq('id', animeId).single();
   if (!anime) { adminNav('animes', null); return; }
-  const { data: eps } = await sb.from('episodes').select('*').eq('anime_id', animeId).order('id', { ascending: true }).limit(1);
+  const { data: eps } = await sb.from('episodes').select('*').eq('anime_id', animeId).eq('season', 1).eq('num', 1).order('id', { ascending: true });
   const ep = eps && eps.length > 0 ? eps[0] : null;
+  const extraCount = eps ? eps.length - 1 : 0;
   el.innerHTML = `
   <div class="admin-header-bar">
     <div>
@@ -1807,6 +1811,7 @@ async function renderAdminMovieVideo(el, animeId) {
     <div class="admin-section-card">
       <div class="admin-section-title">🎬 Vídeo do filme</div>
       <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.25rem">${ep && ep.video_url ? '<span style="color:#4ade80">✓ Este filme já tem um vídeo cadastrado.</span>' : 'Nenhum vídeo cadastrado ainda. Cole a URL abaixo para publicar.'}</div>
+      ${extraCount > 0 ? `<div style="font-size:.78rem;color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:.6rem .9rem;margin-bottom:1rem">⚠️ Encontramos ${extraCount} registro(s) de vídeo duplicado(s) para este filme — isso pode fazer o player carregar o vídeo errado. Ao salvar, os duplicados serão removidos automaticamente.</div>` : ''}
       <div class="form-group"><label class="form-label">URL do vídeo *</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame, ex: https://fembed.sx/e/533535)"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Duração</label><input class="form-input" id="mvDur" value="${ep?.duration||'01:45:00'}" placeholder="01:45:00"></div>
@@ -1833,8 +1838,15 @@ async function saveMovieVideo(animeId, epId) {
     thumbnail_url: document.getElementById('mvThumb').value.trim(),
     video_url: videoUrl,
   };
-  const { error } = epId
-    ? await sb.from('episodes').update(payload).eq('id', epId)
+  // Garante que não existam registros duplicados de vídeo para este filme
+  const { data: existing } = await sb.from('episodes').select('id').eq('anime_id', animeId).eq('season', 1).eq('num', 1).order('id', { ascending: true });
+  const keepId = epId || (existing && existing.length > 0 ? existing[0].id : null);
+  if (existing && existing.length > 0) {
+    const dupeIds = existing.map(e => e.id).filter(id => id !== keepId);
+    if (dupeIds.length > 0) await sb.from('episodes').delete().in('id', dupeIds);
+  }
+  const { error } = keepId
+    ? await sb.from('episodes').update(payload).eq('id', keepId)
     : await sb.from('episodes').insert(payload);
   if (error) { showNotif('❌ Erro: ' + error.message, 'error'); return; }
   showNotif('✅ Vídeo do filme salvo!', 'success');
