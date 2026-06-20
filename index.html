@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RitiFlix - Sua Plataforma de Filmes e Séries</title>
+<link rel="icon" type="image/png" href="ritiflix.png">
+<link rel="apple-touch-icon" href="ritiflix.png">
 <meta name="description" content="Assista filmes e séries online em HD gratuitamente. RitiFlix - a melhor plataforma de streaming do Brasil.">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -289,6 +291,9 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 /* LOADER */
 .page-loader{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem;transition:opacity .5s}
 .loader-logo{font-family:'Playfair Display',serif;font-size:2.8rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:pulse 1.6s ease-in-out infinite}
+.logo img{height:34px;width:auto;display:block}
+.loader-logo img{height:64px;width:auto;display:block;margin:0 auto}
+.modal-logo img{height:44px;width:auto;display:block}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .loader-bar{width:180px;height:2px;background:var(--bg3);border-radius:2px;overflow:hidden}
 .loader-bar-fill{height:100%;background:var(--grad);border-radius:2px;animation:loading 1.5s ease-in-out infinite}
@@ -361,7 +366,7 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 
 <!-- LOADER -->
 <div class="page-loader" id="loader">
-  <div class="loader-logo">✦ RitiFlix</div>
+  <div class="loader-logo"><img src="ritiflix.png" alt="RitiFlix"></div>
   <div class="loader-bar"><div class="loader-bar-fill"></div></div>
   <div id="loaderStatus" style="font-size:.75rem;color:#666;margin-top:.5rem"></div>
 </div>
@@ -391,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- NAVBAR -->
 <nav id="navbar">
   <div class="nav-inner">
-    <div class="logo" onclick="navigate('home')">✦ RitiFlix</div>
+    <div class="logo" onclick="navigate('home')"><img src="ritiflix.png" alt="RitiFlix"></div>
     <div class="nav-links">
       <a onclick="navigate('home')" data-page="home" class="active">Início</a>
       <a onclick="navigate('search')" data-page="search">Explorar</a>
@@ -682,7 +687,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal-overlay hidden" id="modal-login" onclick="closeModalOverlay(event,'login')">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('login')">✕</button>
-    <div class="modal-logo">RitiFlix</div>
+    <div class="modal-logo"><img src="ritiflix.png" alt="RitiFlix"></div>
     <div class="modal-subtitle">Entre na sua conta</div>
     <div class="form-group">
       <label class="form-label">E-mail ou usuário</label>
@@ -705,7 +710,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal-overlay hidden" id="modal-register" onclick="closeModalOverlay(event,'register')">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('register')">✕</button>
-    <div class="modal-logo">RitiFlix</div>
+    <div class="modal-logo"><img src="ritiflix.png" alt="RitiFlix"></div>
     <div class="modal-subtitle">Crie sua conta grátis</div>
     <div class="form-group">
       <label class="form-label">Nome de usuário</label>
