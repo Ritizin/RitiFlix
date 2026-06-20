@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RitiFlix - Sua Plataforma de Filmes e Séries</title>
 <meta name="description" content="Assista filmes e séries online em HD gratuitamente. RitiFlix - a melhor plataforma de streaming do Brasil.">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<!-- Segurança: Content-Security-Policy restringe de onde scripts/estilos/conexões podem vir, mitigando XSS.
+     frame-src é deixado amplo em https: pois o player precisa embutir provedores de vídeo variados cadastrados pelo admin. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org; frame-src https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -296,11 +302,27 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .history-list{display:flex;flex-direction:column;gap:.75rem}
 .history-item{display:flex;gap:1rem;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;cursor:pointer;transition:all .2s;align-items:center}
 .history-item:hover{border-color:rgba(201,168,76,0.25);background:var(--bg3)}
-.history-thumb{width:80px;height:52px;border-radius:8px;background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.8rem}
+.history-thumb{width:80px;height:52px;border-radius:8px;background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.8rem;overflow:hidden}
+.history-thumb img{width:100%;height:100%;object-fit:cover}
 .history-info h4{font-size:.9rem;font-weight:600;margin-bottom:.25rem}
 .history-info p{font-size:.8rem;color:var(--text3)}
 .continue-bar{height:2px;background:var(--bg4);border-radius:2px;margin-top:.5rem;overflow:hidden}
 .continue-bar-fill{height:100%;background:var(--grad)}
+.history-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+.history-remove{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:all .2s;flex-shrink:0}
+.history-remove:hover{background:rgba(220,80,80,0.12);border-color:rgba(220,80,80,0.4);color:#e57373}
+.history-skeleton{height:84px;border-radius:12px;background:linear-gradient(90deg,var(--card) 25%,var(--bg3) 50%,var(--card) 75%);background-size:200% 100%;animation:skeleton-pulse 1.4s ease-in-out infinite}
+@keyframes skeleton-pulse{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* TOGGLE CHIPS (admin: popular / destaque / em alta) */
+.toggle-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}
+.toggle-chip{position:relative}
+.toggle-chip input{position:absolute;opacity:0;width:0;height:0}
+.toggle-chip span{display:flex;align-items:center;gap:.45rem;padding:.55rem 1rem;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s;user-select:none}
+.toggle-chip span .tc-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);transition:all .2s;flex-shrink:0}
+.toggle-chip input:checked + span{background:rgba(201,168,76,0.1);border-color:var(--gold);color:var(--gold2)}
+.toggle-chip input:checked + span .tc-dot{background:var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.6)}
+.toggle-chip span:hover{border-color:rgba(201,168,76,0.4)}
+.toggle-chip input:focus-visible + span{outline:2px solid var(--gold);outline-offset:2px}
 /* SEARCH DROPDOWN */
 .search-results-drop{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);max-height:320px;overflow-y:auto;z-index:200}
 .drop-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;cursor:pointer;transition:all .2s}
@@ -447,6 +469,14 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </div>
 
+  <div class="section" id="continueSection" style="display:none;padding-top:0">
+    <div class="section-header">
+      <div class="section-title">📺 Continuar Assistindo</div>
+      <a class="see-all" onclick="navigate('profile','historico')">Ver tudo →</a>
+    </div>
+    <div id="continueGrid"></div>
+  </div>
+
   <div class="section" style="padding-top:0">
     <div class="section-header">
       <div class="section-title">🔥 Populares</div>
@@ -477,13 +507,6 @@ document.addEventListener('DOMContentLoaded', function() {
       <a class="see-all" onclick="navigate('search','Lançamentos')">Ver todos →</a>
     </div>
     <div class="cards-grid" id="newReleasesGrid"></div>
-  </div>
-
-  <div class="section" id="continueSection" style="display:none">
-    <div class="section-header">
-      <div class="section-title">📺 Continuar Assistindo</div>
-    </div>
-    <div id="continueGrid"></div>
   </div>
 </div>
 
@@ -600,9 +623,9 @@ document.addEventListener('DOMContentLoaded', function() {
       <button class="btn btn-ghost" onclick="openModal('editProfile')">✏️ Editar</button>
     </div>
     <div class="profile-tabs">
-      <div class="profile-tab active" onclick="switchProfileTab('favoritos',this)">❤️ Favoritos</div>
-      <div class="profile-tab" onclick="switchProfileTab('historico',this)">📺 Histórico</div>
-      <div class="profile-tab" onclick="switchProfileTab('config',this)">⚙️ Configurações</div>
+      <div class="profile-tab active" data-tab="favoritos" onclick="switchProfileTab('favoritos',this)">❤️ Favoritos</div>
+      <div class="profile-tab" data-tab="historico" onclick="switchProfileTab('historico',this)">📺 Histórico</div>
+      <div class="profile-tab" data-tab="config" onclick="switchProfileTab('config',this)">⚙️ Configurações</div>
     </div>
     <div class="profile-panel active" id="panel-favoritos">
       <div class="cards-grid" id="favGrid"></div>
@@ -696,7 +719,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     <div class="form-group">
       <label class="form-label">Senha</label>
-      <input type="password" class="form-input" id="regPw" placeholder="Mínimo 6 caracteres">
+      <input type="password" class="form-input" id="regPw" placeholder="Mín. 8 caracteres, com letras e números">
       <div class="form-error hidden" id="regPwErr"></div>
     </div>
     <div class="form-group">
@@ -753,9 +776,21 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================
 
 function sanitize(str){return String(str).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// Segurança: aceita apenas URLs http(s) absolutas, bloqueando javascript:, data:, vbscript: e afins
+// usados em ataques de XSS via campos de URL (capa, vídeo, thumbnail).
+function isSafeUrl(str){
+  if (!str) return true; // campo vazio é válido (opcional)
+  try { const u = new URL(String(str).trim()); return u.protocol === 'http:' || u.protocol === 'https:'; }
+  catch(e) { return false; }
+}
 
 // ============================================================
 // TMDb — API Integration
+// Nota de segurança: este token é de "leitura" (api_read) do TMDb e fica
+// visível no código-fonte do site. Isso não expõe dados de usuários nem
+// do banco — só permite, na pior hipótese, alguém usar sua cota de busca
+// do TMDb. Se quiser eliminar esse risco depois, dá pra mover essa chamada
+// para uma Supabase Edge Function (me peça o guia quando quiser fazer isso).
 // ============================================================
 const TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZTQ4MThiZDcxMzA2MWRhZWU1ZGRiZjIyMGRmZDkxOCIsIm5iZiI6MTc4MDMyNDI1OC4yNjMsInN1YiI6IjZhMWQ5N2EyZWE1ODI3MjM0M2NhYjZjNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.lk3ywoIrM8J7QcSVW_9lA0UcvxJhqB8xu4YxOVjbLd8';
 const TMDB_BASE  = 'https://api.themoviedb.org/3';
@@ -965,7 +1000,14 @@ async function checkAuth() {
   } catch(e) {}
 }
 
+let _loginAttempts = 0;
+let _loginLockUntil = 0;
 async function doLogin() {
+  if (Date.now() < _loginLockUntil) {
+    const secs = Math.ceil((_loginLockUntil - Date.now())/1000);
+    showErr('loginErr', `Muitas tentativas. Tente novamente em ${secs}s.`);
+    return;
+  }
   const ident = document.getElementById('loginEmail').value.trim();
   const pw = document.getElementById('loginPw').value;
   clearFormErrors('login');
@@ -978,40 +1020,57 @@ async function doLogin() {
     try {
       const { data: profile } = await sb.from('profiles').select('email').eq('username', ident).maybeSingle();
       if (profile && profile.email) { emailToUse = profile.email; }
-      else { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; showErr('loginErr','Usuário não encontrado.'); return; }
+      else { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; showErr('loginErr','Usuário não encontrado.'); _registerFailedLogin(); return; }
     } catch(e) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; showErr('loginErr','Erro ao buscar usuário.'); return; }
   }
   const { data, error } = await sb.auth.signInWithPassword({ email: emailToUse, password: pw });
   loginBtn.disabled = false; loginBtn.textContent = 'Entrar';
-  if (error) { showErr('loginErr','E-mail ou senha incorretos.'); return; }
+  if (error) { showErr('loginErr','E-mail ou senha incorretos.'); _registerFailedLogin(); return; }
+  _loginAttempts = 0;
   await loadCurrentUser(data.user);
   closeModal('login'); checkAuth();
   showNotif('✅ Bem-vindo de volta, ' + (currentUser?.username || 'você') + '!', 'success');
   document.getElementById('loginEmail').value = ''; document.getElementById('loginPw').value = '';
   if (currentUser?.role === 'admin') setTimeout(() => navigate('admin'), 300);
 }
+function _registerFailedLogin() {
+  _loginAttempts++;
+  if (_loginAttempts >= 5) { _loginLockUntil = Date.now() + 30000; _loginAttempts = 0; showErr('loginErr','Muitas tentativas incorretas. Aguarde 30s.'); }
+}
 
+let _registerAttempts = 0;
+let _registerLockUntil = 0;
 async function doRegister() {
+  if (Date.now() < _registerLockUntil) {
+    const secs = Math.ceil((_registerLockUntil - Date.now())/1000);
+    showErr('regErr', `Muitas tentativas. Tente novamente em ${secs}s.`);
+    return;
+  }
   const uname = document.getElementById('regUser').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const pw = document.getElementById('regPw').value;
   const pw2 = document.getElementById('regPw2').value;
   clearFormErrors('reg');
   let ok = true;
-  if (!uname || uname.length < 3) { showFieldError('regUser','regUserErr','Mínimo 3 caracteres'); ok = false; }
-  if (!/\S+@\S+\.\S+/.test(email)) { showFieldError('regEmail','regEmailErr','E-mail inválido'); ok = false; }
-  if (pw.length < 6) { showFieldError('regPw','regPwErr','Mínimo 6 caracteres'); ok = false; }
+  if (!uname || uname.length < 3 || uname.length > 24) { showFieldError('regUser','regUserErr','Use entre 3 e 24 caracteres'); ok = false; }
+  else if (!/^[\p{L}\p{N}_\- ]+$/u.test(uname)) { showFieldError('regUser','regUserErr','Use apenas letras, números, espaço, - e _'); ok = false; }
+  if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) { showFieldError('regEmail','regEmailErr','E-mail inválido'); ok = false; }
+  if (pw.length < 8) { showFieldError('regPw','regPwErr','Mínimo 8 caracteres'); ok = false; }
+  else if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) { showFieldError('regPw','regPwErr','Use letras e números na senha'); ok = false; }
   if (pw !== pw2) { showFieldError('regPw2','regPw2Err','Senhas não coincidem'); ok = false; }
-  if (!ok) return;
+  if (!ok) { _registerAttempts++; if (_registerAttempts >= 8) { _registerLockUntil = Date.now() + 30000; _registerAttempts = 0; } return; }
   const regBtn = document.getElementById('regBtn');
   regBtn.disabled = true; regBtn.textContent = 'Criando conta...';
   const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { username: sanitize(uname) } } });
   regBtn.disabled = false; regBtn.textContent = 'Criar conta';
   if (error) {
+    _registerAttempts++;
+    if (_registerAttempts >= 8) { _registerLockUntil = Date.now() + 30000; _registerAttempts = 0; }
     let msg = error.message;
     if (msg.includes('already registered')) msg = 'Este e-mail já está cadastrado.';
     showErr('regErr', msg); return;
   }
+  _registerAttempts = 0;
   if (data && data.user) { await loadCurrentUser(data.user); }
   closeModal('register'); checkAuth();
   showNotif('🎉 Conta criada! Bem-vindo, ' + sanitize(uname) + '!', 'success');
@@ -1075,7 +1134,7 @@ function navigate(page, filter) {
 // ============================================================
 async function getAnimes() {
   const { data } = await sb.from('animes').select('*').order('id', { ascending: true });
-  return (data || []).map(a => ({ ...a, new: a.is_new, desc: a.description, genres: a.genres || [] }));
+  return (data || []).map(a => ({ ...a, new: a.is_new, trending: !!a.trending, desc: a.description, genres: a.genres || [] }));
 }
 
 // ============================================================
@@ -1086,11 +1145,14 @@ async function renderHome() {
     const animes = await getAnimes();
     animateCounters(animes);
     renderGrid('popularGrid', animes.filter(a => a.popular).slice(0, 8));
-    // filmes = type 'filme' (ou, para títulos antigos, gênero 'Filme')
-    const movies = animes.filter(isAnimeMovie).slice(0,8);
-    const series = animes.filter(a => !isAnimeMovie(a)).slice(0,8);
-    renderGrid('moviesGrid', movies.length ? movies : animes.filter(a=>a.featured).slice(0,8));
-    renderGrid('seriesGrid', series.length ? series : animes.slice(0,8));
+    // filmes em destaque = filme + featured (com fallback pra qualquer filme se nada foi marcado ainda)
+    const featuredMovies = animes.filter(a => isAnimeMovie(a) && a.featured);
+    const movies = (featuredMovies.length ? featuredMovies : animes.filter(isAnimeMovie)).slice(0, 8);
+    // séries em alta = série + trending (com fallback pra qualquer série se nada foi marcado ainda)
+    const trendingSeries = animes.filter(a => !isAnimeMovie(a) && a.trending);
+    const series = (trendingSeries.length ? trendingSeries : animes.filter(a => !isAnimeMovie(a))).slice(0, 8);
+    renderGrid('moviesGrid', movies);
+    renderGrid('seriesGrid', series);
     renderGrid('newReleasesGrid', animes.filter(a => a.new).slice(0, 8));
     renderContinue(animes);
   } catch(e) { console.error('renderHome error:', e); }
@@ -1147,25 +1209,74 @@ async function renderContinue(animes) {
   const section = document.getElementById('continueSection');
   const grid = document.getElementById('continueGrid');
   if (!currentUser || !section || !grid) return;
-  const { data: history } = await sb.from('watch_history')
-    .select('*, animes(title, emoji, genres), episodes(num)')
-    .eq('user_id', currentUser.id)
-    .order('watched_at', { ascending: false })
-    .limit(5);
-  if (!history || history.length === 0) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  grid.innerHTML = '<div class="history-list">' + history.map(h => {
-    const a = h.animes; if (!a) return '';
-    return `<div class="history-item" onclick="navigate('detail',${h.anime_id})">
-      <div class="history-thumb">${a.emoji}</div>
+  try {
+    const { data: history, error } = await sb.from('watch_history')
+      .select('*, animes(title, emoji, poster, genres, type), episodes(num)')
+      .eq('user_id', currentUser.id)
+      .order('watched_at', { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    // Remove entradas órfãs (título deletado) e mantém só a mais recente por anime
+    const seen = new Set();
+    const items = (history || []).filter(h => {
+      if (!h.animes || !h.anime_id) return false;
+      if (seen.has(h.anime_id)) return false;
+      seen.add(h.anime_id);
+      return true;
+    }).slice(0, 5);
+    if (items.length === 0) { section.style.display = 'none'; grid.innerHTML = ''; return; }
+    section.style.display = 'block';
+    grid.innerHTML = '<div class="history-list">' + items.map(h => historyItemHTML(h, 'detail')).join('') + '</div>';
+  } catch (e) {
+    console.error('renderContinue error:', e);
+    section.style.display = 'none';
+  }
+}
+
+function historyItemHTML(h, clickTarget) {
+  const a = h.animes;
+  const movie = isAnimeMovie(a);
+  const epLabel = movie ? '' : ' - Ep. ' + (h.ep_num ?? (h.episodes ? h.episodes.num : ''));
+  const progress = Math.max(0, Math.min(100, h.progress || 0)) || 4;
+  const thumb = a.poster ? `<img src="${a.poster}" alt="">` : (a.emoji || '🎬');
+  const subtitle = clickTarget === 'player'
+    ? 'Assistido em ' + formatDate(h.watched_at)
+    : ((a.genres||[]).slice(0,3).join(', ') || '\u00A0');
+  const clickAction = clickTarget === 'player'
+    ? `navigate('player',{animeId:${h.anime_id},epId:${h.episode_id}})`
+    : `navigate('detail',${h.anime_id})`;
+  return `<div class="history-item" onclick="${clickAction}">
+      <div class="history-thumb">${thumb}</div>
       <div class="history-info" style="flex:1">
-        <h4>${sanitize(a.title)} - Ep. ${h.ep_num}</h4>
-        <p>${(a.genres||[]).join(', ')}</p>
-        <div class="continue-bar"><div class="continue-bar-fill" style="width:${h.progress||40}%"></div></div>
+        <h4>${sanitize(a.title)}${epLabel}</h4>
+        <p>${subtitle}</p>
+        <div class="continue-bar"><div class="continue-bar-fill" style="width:${progress}%"></div></div>
       </div>
-      <button class="btn btn-red" style="font-size:.8rem;padding:.4rem .85rem" onclick="event.stopPropagation();navigate('player',{animeId:${h.anime_id},epId:${h.episode_id}})">▶</button>
+      <div class="history-actions">
+        <button class="btn btn-red" style="font-size:.8rem;padding:.4rem .85rem" onclick="event.stopPropagation();navigate('player',{animeId:${h.anime_id},epId:${h.episode_id}})" title="Continuar">▶</button>
+        <button class="history-remove" onclick="event.stopPropagation();removeHistoryItem(${h.id},this)" title="Remover do histórico">🗑️</button>
+      </div>
     </div>`;
-  }).join('') + '</div>';
+}
+
+async function removeHistoryItem(historyId, btnEl) {
+  if (!currentUser || !historyId) return;
+  const item = btnEl ? btnEl.closest('.history-item') : null;
+  if (item) { item.style.opacity = '0.4'; item.style.pointerEvents = 'none'; }
+  try {
+    const { error } = await sb.from('watch_history').delete().eq('id', historyId).eq('user_id', currentUser.id);
+    if (error) throw error;
+    if (item) item.remove();
+    showNotif('🗑️ Removido do histórico.', 'success');
+    // Re-renderiza ambas as listas pra manter tudo sincronizado e esconder seções vazias
+    const animes = await getAnimes();
+    renderContinue(animes);
+    if (document.getElementById('historyList')) renderHistory();
+  } catch (e) {
+    console.error('removeHistoryItem error:', e);
+    if (item) { item.style.opacity = ''; item.style.pointerEvents = ''; }
+    showNotif('❌ Não foi possível remover. Tente novamente.', 'error');
+  }
 }
 
 // ============================================================
@@ -1321,17 +1432,34 @@ function loadVideoUrl(videoUrl) {
     container.innerHTML = '<video id="animePlayer" controls style="width:100%;max-height:70vh;background:#000"></video>';
     return;
   }
-  const isDirectFile = /\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(videoUrl);
+  // Segurança: só permite protocolos http/https. Bloqueia javascript:, data:, vbscript: etc.
+  let parsed;
+  try { parsed = new URL(videoUrl, window.location.href); } catch(e) { parsed = null; }
+  if (!parsed || !['http:', 'https:'].includes(parsed.protocol)) {
+    container.innerHTML = '<div style="width:100%;height:50vh;display:flex;align-items:center;justify-content:center;background:#000;color:var(--text3);font-size:.9rem">⚠️ Fonte de vídeo inválida.</div>';
+    console.error('loadVideoUrl: protocolo bloqueado por segurança ->', videoUrl);
+    return;
+  }
+  const safeUrl = parsed.href;
+  const isDirectFile = /\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(safeUrl);
   if (isDirectFile) {
     container.innerHTML = '<video id="animePlayer" controls style="width:100%;max-height:70vh;background:#000"></video>';
     const video = document.getElementById('animePlayer');
-    if (videoUrl.endsWith('.m3u8') && window.Hls && Hls.isSupported()) {
-      const hls = new Hls(); hls.loadSource(videoUrl); hls.attachMedia(video);
-    } else { video.src = videoUrl; }
+    if (safeUrl.endsWith('.m3u8') && window.Hls && Hls.isSupported()) {
+      const hls = new Hls(); hls.loadSource(safeUrl); hls.attachMedia(video);
+    } else { video.src = safeUrl; }
     return;
   }
-  // URL de frame/embed (ex: https://fembed.sx/e/533535)
-  container.innerHTML = `<iframe src="${videoUrl}" style="width:100%;height:70vh;max-height:70vh;background:#000;border:none" allowfullscreen allow="autoplay; fullscreen; encrypted-media"></iframe>`;
+  // URL de frame/embed (ex: https://fembed.sx/e/533535) — criado via DOM API, não via innerHTML com a URL crua
+  container.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.src = safeUrl;
+  iframe.style.cssText = 'width:100%;height:70vh;max-height:70vh;background:#000;border:none';
+  iframe.allowFullscreen = true;
+  iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media');
+  iframe.setAttribute('referrerpolicy', 'no-referrer');
+  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups');
+  container.appendChild(iframe);
 }
 
 async function renderPlayer(data) {
@@ -1419,7 +1547,7 @@ async function renderComments() {
   const list = document.getElementById('commentsList'); if (!list) return;
   if (!data || data.length === 0) { list.innerHTML = '<p style="color:var(--text3);font-size:.875rem;padding:1rem 0">Seja o primeiro a comentar!</p>'; return; }
   list.innerHTML = data.map(c => `<div class="comment">
-    <div class="comment-av">${c.profiles?.avatar || c.profiles?.username?.[0]?.toUpperCase() || '?'}</div>
+    <div class="comment-av">${sanitize(c.profiles?.avatar || c.profiles?.username?.[0]?.toUpperCase() || '?')}</div>
     <div class="comment-body">
       <div class="comment-author">${sanitize(c.profiles?.username||'Usuário')}</div>
       <div class="comment-text">${sanitize(c.text)}</div>
@@ -1469,7 +1597,7 @@ function switchProfileTab(tab, el) {
   document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.profile-panel').forEach(p => p.classList.remove('active'));
   if (el) el.classList.add('active');
-  else document.querySelectorAll('.profile-tab').forEach(t => { if (t.textContent.toLowerCase().includes(tab)) t.classList.add('active'); });
+  else document.querySelectorAll('.profile-tab').forEach(t => { if (t.getAttribute('data-tab') === tab) t.classList.add('active'); });
   const panel = document.getElementById('panel-' + tab);
   if (panel) panel.classList.add('active');
 }
@@ -1491,28 +1619,31 @@ async function renderHistory() {
   const list = document.getElementById('historyList');
   const empty = document.getElementById('historyEmpty');
   if (!list) return;
-  const { data: history } = await sb.from('watch_history')
-    .select('*, animes(title, emoji, genres), episodes(num)')
-    .eq('user_id', currentUser.id).order('watched_at', { ascending: false }).limit(20);
-  if (!history || history.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-  list.innerHTML = history.map(h => {
-    const a = h.animes; if (!a) return '';
-    return `<div class="history-item" onclick="navigate('player',{animeId:${h.anime_id},epId:${h.episode_id}})">
-      <div class="history-thumb">${a.emoji}</div>
-      <div class="history-info" style="flex:1">
-        <h4>${sanitize(a.title)} - Ep. ${h.ep_num}</h4>
-        <p>Assistido em ${formatDate(h.watched_at)}</p>
-        <div class="continue-bar"><div class="continue-bar-fill" style="width:${h.progress||10}%"></div></div>
-      </div>
+  list.innerHTML = '<div class="history-skeleton"></div><div class="history-skeleton"></div><div class="history-skeleton"></div>';
+  if (empty) empty.style.display = 'none';
+  try {
+    const { data: history, error } = await sb.from('watch_history')
+      .select('*, animes(title, emoji, poster, genres, type), episodes(num)')
+      .eq('user_id', currentUser.id).order('watched_at', { ascending: false }).limit(50);
+    if (error) throw error;
+    const items = (history || []).filter(h => h.animes && h.anime_id);
+    if (items.length === 0) { list.innerHTML = ''; if (empty) empty.style.display = 'block'; return; }
+    if (empty) empty.style.display = 'none';
+    list.innerHTML = items.map(h => historyItemHTML(h, 'player')).join('');
+  } catch (e) {
+    console.error('renderHistory error:', e);
+    list.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--text3)">
+      Não foi possível carregar seu histórico agora.
+      <div style="margin-top:.75rem"><button class="btn btn-ghost" onclick="renderHistory()">🔄 Tentar novamente</button></div>
     </div>`;
-  }).join('');
+  }
 }
 
 async function changePassword() {
   const nw = document.getElementById('newPw').value;
   const nw2 = document.getElementById('newPw2').value;
-  if (nw.length < 6) { showNotif('❌ Nova senha muito curta.', 'error'); return; }
+  if (nw.length < 8) { showNotif('❌ A nova senha precisa de pelo menos 8 caracteres.', 'error'); return; }
+  if (!/[a-zA-Z]/.test(nw) || !/[0-9]/.test(nw)) { showNotif('❌ Use letras e números na nova senha.', 'error'); return; }
   if (nw !== nw2) { showNotif('❌ Senhas não coincidem.', 'error'); return; }
   const { error } = await sb.auth.updateUser({ password: nw });
   if (error) { showNotif('❌ ' + error.message, 'error'); return; }
@@ -1600,13 +1731,19 @@ async function renderAdminAnimes(el) {
   const allAnimes = await getAnimes();
   const totalMovies = allAnimes.filter(isAnimeMovie).length;
   const totalSeries = allAnimes.length - totalMovies;
+  const totalPopular = allAnimes.filter(a => a.popular).length;
+  const totalTrending = allAnimes.filter(a => a.trending).length;
   let animes = allAnimes;
   if (adminAnimeFilter === 'Séries') animes = allAnimes.filter(a => !isAnimeMovie(a));
   else if (adminAnimeFilter === 'Filmes') animes = allAnimes.filter(isAnimeMovie);
+  else if (adminAnimeFilter === 'Populares') animes = allAnimes.filter(a => a.popular);
+  else if (adminAnimeFilter === 'EmAlta') animes = allAnimes.filter(a => a.trending);
   const tabs = [
     { key: 'Todos', label: `Todos (${allAnimes.length})` },
     { key: 'Séries', label: `📺 Séries (${totalSeries})` },
     { key: 'Filmes', label: `🎬 Filmes (${totalMovies})` },
+    { key: 'Populares', label: `🔥 Populares (${totalPopular})` },
+    { key: 'EmAlta', label: `📈 Em Alta (${totalTrending})` },
   ];
   el.innerHTML = `
   <div class="admin-header-bar">
@@ -1624,7 +1761,11 @@ async function renderAdminAnimes(el) {
       <div style="aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:3rem;position:relative;overflow:hidden">
         ${a.poster ? `<img src="${a.poster}" style="width:100%;height:100%;object-fit:cover">` : `<span style="opacity:.5">${a.emoji}</span>`}
         <span style="position:absolute;top:.4rem;left:.4rem;background:rgba(7,9,15,0.85);color:${movie?'var(--gold2)':'#7dd3fc'};font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px;letter-spacing:.04em">${movie?'🎬 FILME':'📺 SÉRIE'}</span>
-        ${a.featured ? '<span style="position:absolute;top:.4rem;right:.4rem;background:var(--grad);color:#07090f;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">⭐ DESTAQUE</span>' : ''}
+        <div style="position:absolute;top:.4rem;right:.4rem;display:flex;flex-direction:column;gap:.25rem;align-items:flex-end">
+          ${a.featured ? '<span style="background:var(--grad);color:#07090f;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">⭐ DESTAQUE</span>' : ''}
+          ${a.popular ? '<span style="background:rgba(201,168,76,0.85);color:#07090f;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">🔥 POPULAR</span>' : ''}
+          ${a.trending ? '<span style="background:rgba(59,130,246,0.85);color:#fff;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">📈 EM ALTA</span>' : ''}
+        </div>
       </div>
       <div style="padding:.75rem">
         <div style="font-weight:700;font-size:.9rem;margin-bottom:.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(a.title)}</div>
@@ -1689,10 +1830,15 @@ async function adminEditAnime(id) {
         <div class="form-group"><label class="form-label">Nota (0-10)</label><input type="number" step=".1" class="form-input" id="eScore" value="${anime.score}"></div>
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="eGenres" value="${anime.genres.filter(g=>g!=='Filme'&&g!=='Série').join(', ')}"></div>
-      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="eFeatured"${anime.featured?' checked':''} style="accent-color:var(--gold)"> Em destaque</label>
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="eNew"${anime.is_new?' checked':''} style="accent-color:var(--gold)"> Lançamento</label>
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="ePopular"${anime.popular?' checked':''} style="accent-color:var(--gold)"> Popular</label>
+      <div class="form-group">
+        <label class="form-label">Visibilidade na Home</label>
+        <div class="toggle-chips">
+          <label class="toggle-chip"><input type="checkbox" id="eFeatured"${anime.featured?' checked':''}><span><span class="tc-dot"></span>⭐ Em destaque</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="eNew"${anime.is_new?' checked':''}><span><span class="tc-dot"></span>🆕 Lançamento</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="ePopular"${anime.popular?' checked':''}><span><span class="tc-dot"></span>🔥 Populares</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="eTrending"${anime.trending?' checked':''}><span><span class="tc-dot"></span>📈 Em alta</span></label>
+        </div>
+        <div style="font-size:.72rem;color:var(--text3)">Controla em quais carrosséis da home este título aparece (Populares, Filmes em Alta, Séries em Alta).</div>
       </div>
       <button class="btn btn-red" onclick="saveEditAnime(${id})">💾 Salvar alterações</button>
     </div>
@@ -1703,11 +1849,13 @@ async function adminEditAnime(id) {
 
 async function saveEditAnime(id) {
   const type = document.getElementById('eType').value || 'serie';
+  const posterUrl = document.getElementById('ePoster')?.value?.trim() || '';
+  if (!isSafeUrl(posterUrl)) { showNotif('❌ URL da capa inválida. Use um link http(s) válido.', 'error'); return; }
   await sb.from('animes').update({
     title: sanitize(document.getElementById('eTitle').value.trim()),
     type: type,
     emoji: document.getElementById('eEmoji').value,
-    poster: document.getElementById('ePoster')?.value?.trim() || '',
+    poster: posterUrl,
     description: sanitize(document.getElementById('eDesc').value.trim()),
     status: document.getElementById('eStatus').value,
     episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('eEps').value) || 0),
@@ -1717,6 +1865,7 @@ async function saveEditAnime(id) {
     featured: document.getElementById('eFeatured').checked,
     is_new: document.getElementById('eNew').checked,
     popular: document.getElementById('ePopular').checked,
+    trending: document.getElementById('eTrending').checked,
   }).eq('id', id);
   showNotif('✅ Título atualizado!', 'success');
   adminNav('animes', null);
@@ -1754,10 +1903,15 @@ function renderAdminAddAnime(el) {
         <div class="form-group"><label class="form-label">Nota inicial (0-10)</label><input type="number" step=".1" class="form-input" id="aScore" value="8.0"></div>
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="aGenres" placeholder="Ação, Aventura"></div>
-      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem">
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="aFeatured" style="accent-color:var(--gold)"> Em destaque</label>
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="aNew" checked style="accent-color:var(--gold)"> Lançamento</label>
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.875rem"><input type="checkbox" id="aPopular" style="accent-color:var(--gold)"> Popular</label>
+      <div class="form-group">
+        <label class="form-label">Visibilidade na Home</label>
+        <div class="toggle-chips">
+          <label class="toggle-chip"><input type="checkbox" id="aFeatured"><span><span class="tc-dot"></span>⭐ Em destaque</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="aNew" checked><span><span class="tc-dot"></span>🆕 Lançamento</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="aPopular"><span><span class="tc-dot"></span>🔥 Populares</span></label>
+          <label class="toggle-chip"><input type="checkbox" id="aTrending"><span><span class="tc-dot"></span>📈 Em alta</span></label>
+        </div>
+        <div style="font-size:.72rem;color:var(--text3)">Controla em quais carrosséis da home este título aparece (Populares, Filmes em Alta, Séries em Alta).</div>
       </div>
       <button class="btn btn-red" onclick="saveNewAnime()">✅ Publicar título</button>
     </div>
@@ -1769,13 +1923,15 @@ function renderAdminAddAnime(el) {
 async function saveNewAnime() {
   const title = document.getElementById('aTitle').value.trim();
   const desc = document.getElementById('aDesc').value.trim();
+  const posterUrl = document.getElementById('aPoster').value.trim();
   if (!title || !desc) { showNotif('❌ Título e descrição são obrigatórios.', 'error'); return; }
+  if (!isSafeUrl(posterUrl)) { showNotif('❌ URL da capa inválida. Use um link http(s) válido.', 'error'); return; }
   const type = document.getElementById('aType').value || 'serie';
   const { error } = await sb.from('animes').insert({
     title: sanitize(title),
     type: type,
     emoji: document.getElementById('aEmoji').value || '🎬',
-    poster: document.getElementById('aPoster').value.trim(),
+    poster: posterUrl,
     genres: document.getElementById('aGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
     status: document.getElementById('aStatus').value,
     episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('aEps').value) || 1),
@@ -1785,6 +1941,7 @@ async function saveNewAnime() {
     featured: document.getElementById('aFeatured').checked,
     is_new: document.getElementById('aNew').checked,
     popular: document.getElementById('aPopular').checked,
+    trending: document.getElementById('aTrending').checked,
   });
   if (error) { showNotif('❌ Erro: ' + error.message, 'error'); return; }
   showNotif((type==='filme'?'🎬':'📺') + ' Título "' + sanitize(title) + '" publicado!', 'success');
@@ -1827,7 +1984,10 @@ async function renderAdminMovieVideo(el, animeId) {
 
 async function saveMovieVideo(animeId, epId) {
   const videoUrl = document.getElementById('mvUrl').value.trim();
+  const thumbUrl = document.getElementById('mvThumb').value.trim();
   if (!videoUrl) { showNotif('❌ Cole a URL do vídeo.', 'error'); return; }
+  if (!isSafeUrl(videoUrl)) { showNotif('❌ URL de vídeo inválida. Use um link http(s) válido.', 'error'); return; }
+  if (!isSafeUrl(thumbUrl)) { showNotif('❌ URL de thumbnail inválida. Use um link http(s) válido.', 'error'); return; }
   const { data: anime } = await sb.from('animes').select('title, emoji').eq('id', animeId).single();
   const payload = {
     anime_id: animeId,
@@ -1835,7 +1995,7 @@ async function saveMovieVideo(animeId, epId) {
     num: 1,
     title: anime?.title || 'Filme',
     duration: document.getElementById('mvDur').value.trim() || '01:45:00',
-    thumbnail_url: document.getElementById('mvThumb').value.trim(),
+    thumbnail_url: thumbUrl,
     video_url: videoUrl,
   };
   // Garante que não existam registros duplicados de vídeo para este filme
@@ -2001,13 +2161,17 @@ async function saveNewEp(backAnimeId, backSeason) {
   const num = parseInt(document.getElementById('epNum').value);
   const title = document.getElementById('epTitle').value.trim();
   const season = parseInt(document.getElementById('epSeason')?.value) || 1;
+  const videoUrl = document.getElementById('epUrl').value.trim() || '';
+  const thumbUrl = document.getElementById('epThumb')?.value?.trim() || '';
   if (!num || !title) { showNotif('❌ Número e título são obrigatórios.', 'error'); return; }
+  if (!isSafeUrl(videoUrl)) { showNotif('❌ URL de vídeo inválida. Use um link http(s) válido.', 'error'); return; }
+  if (!isSafeUrl(thumbUrl)) { showNotif('❌ URL de thumbnail inválida. Use um link http(s) válido.', 'error'); return; }
   const { error } = await sb.from('episodes').insert({
     anime_id: animeId, num, title: sanitize(title),
     duration: document.getElementById('epDur').value || '45:00',
-    thumbnail_url: document.getElementById('epThumb')?.value?.trim() || '',
+    thumbnail_url: thumbUrl,
     season: season,
-    video_url: document.getElementById('epUrl').value || ''
+    video_url: videoUrl
   });
   if (error) { showNotif('❌ Erro: ' + error.message, 'error'); return; }
   showNotif('✅ Episódio adicionado!', 'success');
@@ -2049,13 +2213,17 @@ async function renderAdminEditEp(el, epId) {
 
 async function saveEditEp(epId, animeId) {
   const season = parseInt(document.getElementById('eeSeasonN').value) || 1;
+  const videoUrl = document.getElementById('eeUrl').value.trim();
+  const thumbUrl = document.getElementById('eeThumb').value.trim();
+  if (!isSafeUrl(videoUrl)) { showNotif('❌ URL de vídeo inválida. Use um link http(s) válido.', 'error'); return; }
+  if (!isSafeUrl(thumbUrl)) { showNotif('❌ URL de thumbnail inválida. Use um link http(s) válido.', 'error'); return; }
   await sb.from('episodes').update({
     num: parseInt(document.getElementById('eeNum').value) || 1,
     title: sanitize(document.getElementById('eeTitle').value.trim()),
     duration: document.getElementById('eeDur').value || '45:00',
-    thumbnail_url: document.getElementById('eeThumb').value.trim(),
+    thumbnail_url: thumbUrl,
     season: season,
-    video_url: document.getElementById('eeUrl').value.trim(),
+    video_url: videoUrl,
   }).eq('id', epId);
   showNotif('✅ Episódio atualizado!', 'success');
   adminNav('episodes', null, animeId, season);
@@ -2132,15 +2300,15 @@ function applyHeroBanner(d) {
   const title = hero.querySelector('.hero-title');
   const desc = hero.querySelector('.hero-desc');
   if (coverEl) {
-    if (d.coverUrl) {
-      coverEl.style.backgroundImage = `url('${d.coverUrl}')`;
+    if (d.coverUrl && /^https?:\/\//i.test(d.coverUrl)) {
+      coverEl.style.backgroundImage = `url('${d.coverUrl.replace(/['"\\]/g,'')}')`;
       coverEl.style.display = 'block';
     } else {
       coverEl.style.display = 'none';
     }
   }
   if (badge) badge.textContent = d.badge || badge.textContent;
-  if (title) title.innerHTML = `${d.title1||''}<br><span>${d.title2||''}</span><br>${d.title3||''}`;
+  if (title) title.innerHTML = `${sanitize(d.title1||'')}<br><span>${sanitize(d.title2||'')}</span><br>${sanitize(d.title3||'')}`;
   if (desc) desc.textContent = d.desc || desc.textContent;
 }
 
@@ -2190,8 +2358,13 @@ async function banUser(id) {
 }
 
 async function changeRole(id, role) {
+  if (role === 'admin' && !confirm('Tem certeza que deseja conceder privilégios de ADMINISTRADOR a este usuário? Ele terá acesso total ao painel.')) {
+    adminNav('users', null); // reverte o <select> visualmente
+    return;
+  }
   await sb.from('profiles').update({ role }).eq('id', id);
   showNotif('✅ Cargo atualizado para ' + role, 'success');
+  adminNav('users', null);
 }
 
 async function renderAdminComments(el) {
