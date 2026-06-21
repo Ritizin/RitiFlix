@@ -1091,6 +1091,27 @@ async function loadCurrentUser(authUser) {
   }
 }
 
+// Garante que a sessão do Supabase ainda é válida antes de operações que exigem login
+// (ex: salvar histórico de "Continuar Assistindo"). Se o refresh token expirou/sumiu,
+// tenta renovar; se não conseguir, desloga localmente e avisa o usuário em vez de
+// deixar inserts/updates falharem silenciosamente com erro 400/406.
+async function ensureSession() {
+  try {
+    const { data: { session }, error } = await sb.auth.getSession();
+    if (session && !error) return true;
+    const { data: refreshed, error: refreshErr } = await sb.auth.refreshSession();
+    if (refreshed?.session && !refreshErr) { await loadCurrentUser(refreshed.session.user); return true; }
+    throw refreshErr || new Error('Sessão inválida');
+  } catch (e) {
+    if (currentUser) {
+      currentUser = null;
+      checkAuth();
+      showNotif('⚠️ Sua sessão expirou. Faça login novamente para salvar seu progresso.', 'error');
+    }
+    return false;
+  }
+}
+
 async function checkAuth() {
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -1467,7 +1488,7 @@ async function renderDetail(id) {
   document.getElementById('detailDesc').textContent = anime.desc || '';
   let userRating = 0;
   if (currentUser) {
-    const { data: r } = await sb.from('ratings').select('score').eq('user_id', currentUser.id).eq('anime_id', currentAnimeId).single();
+    const { data: r } = await sb.from('ratings').select('score').eq('user_id', currentUser.id).eq('anime_id', currentAnimeId).maybeSingle();
     if (r) userRating = r.score;
   }
   document.getElementById('userRating').innerHTML = [1,2,3,4,5].map(i =>
@@ -1475,7 +1496,7 @@ async function renderDetail(id) {
   ).join('');
   const favBtn = document.getElementById('favBtn');
   if (currentUser && favBtn) {
-    const { data: fav } = await sb.from('favorites').select('anime_id').eq('user_id', currentUser.id).eq('anime_id', currentAnimeId).single();
+    const { data: fav } = await sb.from('favorites').select('anime_id').eq('user_id', currentUser.id).eq('anime_id', currentAnimeId).maybeSingle();
     favBtn.classList.toggle('active', !!fav);
     favBtn.textContent = fav ? '♥ Favoritado' : '♡ Favoritar';
   }
@@ -1525,7 +1546,7 @@ async function watchFirstEp() {
 
 async function toggleFav() {
   if (!currentUser) { openModal('login'); return; }
-  const { data: existing } = await sb.from('favorites').select('*').eq('user_id', currentUser.id).eq('anime_id', currentAnimeId).single();
+  const { data: existing } = await sb.from('favorites').select('*').eq('user_id', currentUser.id).eq('anime_id', currentAnimeId).maybeSingle();
   if (existing) {
     await sb.from('favorites').delete().eq('user_id', currentUser.id).eq('anime_id', currentAnimeId);
     showNotif('💔 Removido dos favoritos.', 'success');
@@ -1608,11 +1629,22 @@ async function renderPlayer(data) {
   document.getElementById('playerControls').style.display = 'none';
   document.getElementById('playerPlayBtn').textContent = '▶ Reproduzir';
   isPlaying = false; playerTime = 0;
+  window._historySaveFailed = false;
   if (playerInterval) clearInterval(playerInterval);
-  if (currentUser) {
-    const { data: existing } = await sb.from('watch_history').select('id').eq('user_id', currentUser.id).eq('episode_id', epId).single();
-    if (existing) { await sb.from('watch_history').update({ progress: 10, watched_at: new Date().toISOString() }).eq('id', existing.id); }
-    else { await sb.from('watch_history').insert({ user_id: currentUser.id, anime_id: animeId, episode_id: epId, ep_num: ep.num, progress: 10 }); }
+  if (currentUser && await ensureSession()) {
+    try {
+      const { data: existing, error: selErr } = await sb.from('watch_history').select('id').eq('user_id', currentUser.id).eq('episode_id', epId).maybeSingle();
+      if (selErr) throw selErr;
+      if (existing) {
+        const { error: upErr } = await sb.from('watch_history').update({ progress: 10, watched_at: new Date().toISOString() }).eq('id', existing.id);
+        if (upErr) throw upErr;
+      } else {
+        const { error: insErr } = await sb.from('watch_history').insert({ user_id: currentUser.id, anime_id: animeId, episode_id: epId, ep_num: ep.num, progress: 10 });
+        if (insErr) throw insErr;
+      }
+    } catch (e) {
+      console.error('Erro ao salvar histórico de "Continuar Assistindo":', e);
+    }
   }
   renderComments();
   loadVideoUrl(ep.video_url || '');
@@ -1636,7 +1668,14 @@ function togglePlay() {
       const m = Math.floor(playerTime/60), s = playerTime%60;
       document.getElementById('playerTime').textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s+' / 45:00';
       if (playerTime >= total) { clearInterval(playerInterval); showNotif('Episódio concluído! 🎉', 'success'); }
-      if (currentUser) { await sb.from('watch_history').update({ progress: Math.floor(pct) }).eq('user_id', currentUser.id).eq('episode_id', currentEpId); }
+      if (currentUser && !window._historySaveFailed) {
+        const { error } = await sb.from('watch_history').update({ progress: Math.floor(pct), watched_at: new Date().toISOString() }).eq('user_id', currentUser.id).eq('episode_id', currentEpId);
+        if (error) {
+          console.error('Erro ao atualizar progresso:', error);
+          window._historySaveFailed = true; // evita martelar a API a cada segundo se a sessão caiu
+          await ensureSession();
+        }
+      }
     }, 1000);
   } else { isPlaying = false; clearInterval(playerInterval); ppBtn.textContent = '▶'; }
 }
