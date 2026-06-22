@@ -1063,6 +1063,133 @@ async function tmdbTrending(type='all') {
 }
 
 // ============================================================
+// TMDB — busca de episódios (tela Adicionar/Editar Episódio)
+// ============================================================
+// Fluxo: 1) busca a série pelo nome -> 2) busca a temporada já indicada
+// no formulário -> 3) lista os episódios daquela temporada -> ao
+// escolher, preenche título, miniatura, duração e número do episódio.
+// A URL do vídeo nunca é preenchida automaticamente.
+
+async function tmdbFetchSeasonEpisodes(tvId, seasonNumber) {
+  const data = await tmdbFetch('/tv/'+tvId+'/season/'+seasonNumber);
+  return (data && data.episodes) || [];
+}
+
+function epTmdbSearchBlockHTML(prefix) {
+  return `<div style="background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.2);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem">
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+      <span style="font-size:1.1rem">🎬</span>
+      <span style="font-size:.8rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.1em">Buscar episódio no TMDb</span>
+      <span style="font-size:.7rem;color:var(--text3);margin-left:.3rem">— preenche título, miniatura, duração e número</span>
+    </div>
+    <div style="position:relative">
+      <input id="${prefix}EpTmdbInput" class="form-input" placeholder="🔍  Nome da série..." style="border-color:rgba(201,168,76,0.3)" autocomplete="off">
+      <div id="${prefix}EpTmdbDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg3);border:1px solid rgba(201,168,76,0.25);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,0.55);z-index:400;max-height:340px;overflow-y:auto"></div>
+    </div>
+    <div style="font-size:.71rem;color:var(--text3);margin-top:.5rem">Busque a série, escolha-a e depois selecione o episódio da temporada informada acima. A URL do vídeo não é preenchida — você adiciona manualmente.</div>
+  </div>`;
+}
+
+function renderEpTmdbSeriesDropdown(prefix, results) {
+  const dd = document.getElementById(prefix+'EpTmdbDropdown');
+  if (!dd) return;
+  const tvResults = (results||[]).filter(r => r.media_type === 'tv' || (!r.media_type && r.name));
+  if (tvResults.length === 0) {
+    dd.innerHTML = '<div style="padding:.75rem 1rem;color:var(--text3);font-size:.85rem">Nenhuma série encontrada.</div>';
+    dd.style.display = 'block'; return;
+  }
+  dd.innerHTML = tvResults.slice(0,8).map((r,i) => {
+    const title = r.name || r.title || '?';
+    const year = (r.first_air_date || '').substring(0,4);
+    const thumb = r.poster_path ? `<img src="${TMDB_IMG}${r.poster_path}" style="width:32px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0">` : `<div style="width:32px;height:48px;background:var(--bg4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">📺</div>`;
+    return `<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;cursor:pointer;border-bottom:1px solid rgba(30,45,71,0.5);transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''" onclick="window._epTmdbSelectSeries_${prefix}(${i})">${thumb}<div style="min-width:0"><div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(title)}</div><div style="font-size:.72rem;color:var(--text3)">📺 Série${year?' • '+year:''}</div></div></div>`;
+  }).join('');
+  dd.style.display = 'block';
+  window['_epTmdbSelectSeries_'+prefix] = (idx) => loadEpTmdbEpisodeList(prefix, tvResults[idx]);
+}
+
+async function loadEpTmdbEpisodeList(prefix, series) {
+  window['_epTmdbSeries_'+prefix] = series;
+  const dd = document.getElementById(prefix+'EpTmdbDropdown');
+  const seasonElId = prefix === 'ep' ? 'epSeason' : 'eeSeasonN';
+  const seasonNumber = parseInt(document.getElementById(seasonElId)?.value) || 1;
+  if (dd) dd.innerHTML = '<div style="padding:.75rem 1rem;color:var(--text3);font-size:.85rem">⏳ Carregando episódios da temporada '+seasonNumber+'...</div>';
+  try {
+    const episodes = await tmdbFetchSeasonEpisodes(series.id, seasonNumber);
+    renderEpTmdbEpisodeDropdown(prefix, episodes, seasonNumber);
+  } catch(e) {
+    if (dd) dd.innerHTML = '<div style="padding:.75rem 1rem;color:#f87171;font-size:.85rem">❌ Erro: '+sanitize(e.message)+'</div>';
+  }
+}
+
+function renderEpTmdbEpisodeDropdown(prefix, episodes, seasonNumber) {
+  const dd = document.getElementById(prefix+'EpTmdbDropdown');
+  if (!dd) return;
+  if (!episodes || episodes.length === 0) {
+    dd.innerHTML = '<div style="padding:.75rem 1rem;color:var(--text3);font-size:.85rem">Nenhum episódio encontrado para a temporada '+seasonNumber+'.</div>';
+    dd.style.display = 'block'; return;
+  }
+  dd.innerHTML = episodes.map((e,i) => {
+    const thumb = e.still_path ? `<img src="${TMDB_IMG}${e.still_path}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0">` : `<div style="width:48px;height:32px;background:var(--bg4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0">🎬</div>`;
+    return `<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;cursor:pointer;border-bottom:1px solid rgba(30,45,71,0.5);transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''" onclick="window._epTmdbSelectEp_${prefix}(${i})">${thumb}<div style="min-width:0"><div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ep. ${e.episode_number} — ${sanitize(e.name||'')}</div><div style="font-size:.72rem;color:var(--text3)">${e.runtime?e.runtime+' min':'Duração desconhecida'}</div></div></div>`;
+  }).join('');
+  dd.style.display = 'block';
+  window['_epTmdbSelectEp_'+prefix] = (idx) => fillEpFormFromTmdb(prefix, episodes[idx]);
+}
+
+function fillEpFormFromTmdb(prefix, ep) {
+  const titleId = prefix === 'ep' ? 'epTitle' : 'eeTitle';
+  const numId = prefix === 'ep' ? 'epNum' : 'eeNum';
+  const durId = prefix === 'ep' ? 'epDur' : 'eeDur';
+  const thumbId = prefix === 'ep' ? 'epThumb' : 'eeThumb';
+  const thumbPrevId = prefix === 'ep' ? 'epThumbPrev' : 'eeThumbPrev';
+  const thumbImgId = prefix === 'ep' ? 'epThumbImg' : 'eeThumbImg';
+
+  const titleEl = document.getElementById(titleId); if (titleEl) titleEl.value = ep.name || '';
+  const numEl = document.getElementById(numId); if (numEl) { numEl.value = ep.episode_number || 1; numEl.dataset.touched = '1'; }
+  const durEl = document.getElementById(durId);
+  if (durEl) {
+    const mins = parseInt(ep.runtime) || 0;
+    durEl.value = mins > 0 ? (String(mins).padStart(2,'0')+':00') : durEl.value;
+  }
+  const thumb = ep.still_path ? (TMDB_IMG + ep.still_path) : '';
+  if (thumb) {
+    const thumbEl = document.getElementById(thumbId); if (thumbEl) thumbEl.value = thumb;
+    const prev = document.getElementById(thumbPrevId), img = document.getElementById(thumbImgId);
+    if (prev) prev.style.display = 'block';
+    if (img) img.src = thumb;
+  }
+  const dd = document.getElementById(prefix+'EpTmdbDropdown'); if (dd) dd.style.display = 'none';
+  const inputEl = document.getElementById(prefix+'EpTmdbInput'); if (inputEl) inputEl.value = (ep.name||'');
+  showNotif('✅ TMDb: episódio preenchido automaticamente!', 'success');
+}
+
+function initEpTmdbSearch(prefix) {
+  const inputEl = document.getElementById(prefix+'EpTmdbInput');
+  if (!inputEl) return;
+  let _timer;
+  inputEl.oninput = function() {
+    clearTimeout(_timer);
+    const q = this.value.trim();
+    if (q.length < 2) { const dd=document.getElementById(prefix+'EpTmdbDropdown'); if(dd) dd.style.display='none'; return; }
+    _timer = setTimeout(async () => {
+      try {
+        const results = await tmdbSearch(q, 'tv');
+        renderEpTmdbSeriesDropdown(prefix, results);
+      } catch(e) { showNotif('❌ Erro TMDb: '+e.message, 'error'); }
+    }, 400);
+  };
+  const seasonElId = prefix === 'ep' ? 'epSeason' : 'eeSeasonN';
+  const seasonEl = document.getElementById(seasonElId);
+  if (seasonEl) {
+    seasonEl.addEventListener('change', () => {
+      const series = window['_epTmdbSeries_'+prefix];
+      if (series) loadEpTmdbEpisodeList(prefix, series);
+    });
+  }
+}
+
+// ============================================================
 // SUPABASE — RitiFlix
 // ============================================================
 const SUPABASE_URL = 'https://agcqafpfheycclmyhzkx.supabase.co';
@@ -2300,6 +2427,7 @@ async function renderAdminAddEp(el, animeId, season) {
     </div>
   </div>
   <div class="admin-form">
+    ${epTmdbSearchBlockHTML('ep')}
     <div class="admin-section-card">
       <div class="admin-section-title">Dados do episódio</div>
       <div class="form-group"><label class="form-label">Título *</label><select class="form-select" id="epAnimeId" onchange="updateNextEpNum()">
@@ -2320,6 +2448,7 @@ async function renderAdminAddEp(el, animeId, season) {
     </div>
   </div>`;
   updateNextEpNum();
+  initEpTmdbSearch('ep');
 }
 
 async function updateNextEpNum() {
@@ -2366,6 +2495,7 @@ async function renderAdminEditEp(el, epId) {
     </div>
   </div>
   <div class="admin-form">
+    ${epTmdbSearchBlockHTML('ee')}
     <div class="admin-section-card">
       <div class="admin-section-title">Dados do episódio</div>
       <div class="form-row">
@@ -2385,6 +2515,7 @@ async function renderAdminEditEp(el, epId) {
       </div>
     </div>
   </div>`;
+  initEpTmdbSearch('ee');
 }
 
 async function saveEditEp(epId, animeId) {
