@@ -2310,7 +2310,7 @@ async function renderAdminAddEp(el, animeId, season) {
         <div class="form-group"><label class="form-label">Número do Ep. *</label><input type="number" class="form-input" id="epNum" placeholder="1" min="1"></div>
         <div class="form-group"><label class="form-label">Duração</label><input class="form-input" id="epDur" placeholder="45:00" value="45:00"></div>
       </div>
-      <div class="form-group"><label class="form-label">Título do episódio *</label><input class="form-input" id="epTitle" placeholder="Ex: O início da história"></div>
+      <div class="form-group"><label class="form-label">Título do episódio *</label><input class="form-input" id="epTitle" placeholder="Ex: O início da história"><button type="button" class="btn btn-ghost" style="margin-top:10px" onclick="buscarEpisodioTMDB()">🎬 Buscar dados no TMDB</button></div>
       <div class="form-group"><label class="form-label">URL da Miniatura</label>
         <input class="form-input" id="epThumb" placeholder="https://imagem-thumb.jpg" oninput="var p=document.getElementById('epThumbPrev'),img=document.getElementById('epThumbImg');if(this.value){p.style.display='block';img.src=this.value;}else{p.style.display='none';}">
         <div id="epThumbPrev" style="margin-top:.5rem;display:none"><img id="epThumbImg" src="" style="width:120px;height:75px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
@@ -2703,6 +2703,31 @@ document.addEventListener('keydown', e => {
     });
   }
 });
+
+async function buscarEpisodioTMDB(){
+  const tmdbKey = prompt('Cole sua API Key do TMDB:');
+  if(!tmdbKey) return;
+
+  const serieId = prompt('ID TMDB da série:');
+  const temporada = document.getElementById('epSeason')?.value || 1;
+  const episodio = document.getElementById('epNum')?.value || 1;
+
+  try{
+    const r = await fetch(`https://api.themoviedb.org/3/tv/${serieId}/season/${temporada}/episode/${episodio}?api_key=${tmdbKey}&language=pt-BR`);
+    const d = await r.json();
+
+    const title = document.getElementById('epTitle');
+    const thumb = document.getElementById('epThumb');
+
+    if(title && d.name) title.value = d.name;
+    if(thumb && d.still_path) thumb.value = 'https://image.tmdb.org/t/p/original' + d.still_path;
+
+    if(typeof showNotif === 'function') showNotif('✅ Episódio carregado do TMDB!', 'success');
+  }catch(e){
+    alert('Erro ao buscar episódio no TMDB');
+  }
+}
+
 </script>
 </body>
 </html>
