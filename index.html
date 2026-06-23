@@ -517,6 +517,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <a onclick="navigate('search','Filmes')" data-page="movies">Filmes</a>
       <a onclick="navigate('search','Séries')" data-page="series">Séries</a>
       <a onclick="navigate('search','Lançamentos')" data-page="releases">Lançamentos</a>
+      <a onclick="navigate('search','Animação')" data-page="animation">✨ Animação</a>
       <a onclick="navigate('search','Populares')" data-page="popular">Populares</a>
     </div>
     <div class="nav-right">
@@ -556,6 +557,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <a onclick="navigate('search','Filmes');closeMobileMenu()">🎬 Filmes</a>
   <a onclick="navigate('search','Séries');closeMobileMenu()">📺 Séries</a>
   <a onclick="navigate('search','Lançamentos');closeMobileMenu()">🆕 Lançamentos</a>
+  <a onclick="navigate('search','Animação');closeMobileMenu()">✨ Animação</a>
   <a onclick="navigate('search','Populares');closeMobileMenu()">🔥 Populares</a>
   <div style="height:1px;background:var(--border);margin:.25rem 0"></div>
   <a onclick="openModal('login');closeMobileMenu()" id="mobileLoginLink">🔐 Entrar</a>
@@ -634,6 +636,26 @@ document.addEventListener('DOMContentLoaded', function() {
       <a class="see-all" onclick="navigate('search','Lançamentos')">Ver todos →</a>
     </div>
     <div class="cards-grid" id="newReleasesGrid"></div>
+  </div>
+
+  <div class="section" style="background:linear-gradient(135deg,rgba(13,17,23,0.8),rgba(30,20,50,0.95));border-radius:16px;margin-bottom:2rem;border:1px solid rgba(160,100,255,0.12)">
+    <div class="section-header">
+      <div class="section-title" style="color:#c084fc">✨ Animações</div>
+      <a class="see-all" style="color:#c084fc" onclick="navigate('search','Animação')">Ver todas →</a>
+    </div>
+    <div class="cards-grid" id="animacaoGrid"></div>
+    <div id="animacaoEmpty" style="display:none;text-align:center;padding:2rem;color:var(--text3)">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">✨</div>
+      <p style="font-size:.9rem">Nenhuma animação cadastrada ainda.</p>
+      <button class="btn btn-ghost" style="margin-top:.75rem;font-size:.8rem" onclick="navigate('admin')">+ Adicionar no Admin</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">🔍 Explorar por Gênero</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:.6rem" id="genreTagsHome"></div>
   </div>
 </div>
 
@@ -789,6 +811,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="sidebar-item active" onclick="adminNav('dashboard',this)"><span class="si-icon">📊</span> Dashboard</div>
       <div class="sidebar-section">Conteúdo</div>
       <div class="sidebar-item" onclick="adminNav('animes',this)"><span class="si-icon">🎬</span> Gerenciar Títulos</div>
+      <div class="sidebar-item" onclick="adminNav('genres',this)"><span class="si-icon">🏷️</span> Gêneros</div>
       <div class="sidebar-item" onclick="adminNav('heroBanner',this)"><span class="si-icon">🖼️</span> Banner Hero</div>
       <div class="sidebar-section">Comunidade</div>
       <div class="sidebar-item" onclick="adminNav('users',this)"><span class="si-icon">👥</span> Usuários</div>
@@ -1430,6 +1453,18 @@ async function renderHome() {
     renderGrid('moviesGrid', movies);
     renderGrid('seriesGrid', series);
     renderGrid('newReleasesGrid', animes.filter(a => a.new).slice(0, 8));
+    // Animações
+    const animacaoList = animes.filter(a => (a.genres||[]).includes('Animação')).slice(0, 8);
+    const animGrid = document.getElementById('animacaoGrid');
+    const animEmpty = document.getElementById('animacaoEmpty');
+    if (animGrid) { if (animacaoList.length > 0) { animGrid.style.display=''; if(animEmpty) animEmpty.style.display='none'; renderGrid('animacaoGrid', animacaoList); } else { animGrid.style.display='none'; if(animEmpty) animEmpty.style.display='block'; } }
+    // Genre tags
+    const tagsEl = document.getElementById('genreTagsHome');
+    if (tagsEl) {
+      const genreEmojis = {'Ação':'⚔️','Aventura':'🗺️','Animação':'✨','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Ficção Científica':'🚀','Guerra':'🪖','História':'📜','Mistério':'🕵️','Romance':'❤️','Suspense':'🔍','Terror':'👻','Faroeste':'🤠'};
+      const contentGenres = ['Ação','Aventura','Animação','Comédia','Crime','Documentário','Drama','Família','Fantasia','Ficção Científica','Guerra','História','Mistério','Romance','Suspense','Terror','Faroeste'];
+      tagsEl.innerHTML = contentGenres.map(g => `<button onclick="navigate('search','${g}')" style="padding:.5rem 1.1rem;border-radius:24px;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text2);border:1px solid var(--border);font-family:'Outfit',sans-serif;transition:all .2s;letter-spacing:.02em" onmouseover="this.style.background='rgba(201,168,76,0.08)';this.style.color='var(--gold)';this.style.borderColor='rgba(201,168,76,0.3)'" onmouseout="this.style.background='var(--bg3)';this.style.color='var(--text2)';this.style.borderColor='var(--border)'">${genreEmojis[g]||''} ${g}</button>`).join('');
+    }
     renderContinue(animes);
   } catch(e) { console.error('renderHome error:', e); }
 }
@@ -1558,7 +1593,12 @@ async function removeHistoryItem(historyId, btnEl) {
 // ============================================================
 // SEARCH
 // ============================================================
-const genres = ['Todos','Filmes','Séries','Lançamentos','Populares','Recomendados','Ação','Aventura','Drama','Comédia','Romance','Terror','Ficção Científica','Animação','Documentário','Suspense'];
+// Gêneros organizados por grupo
+const genreGroups = [
+  { label: '📂 Navegar', items: ['Todos','Filmes','Séries','Lançamentos','Populares','Recomendados'] },
+  { label: '🎭 Gêneros', items: ['Ação','Aventura','Animação','Comédia','Crime','Documentário','Drama','Família','Fantasia','Ficção Científica','Guerra','História','Mistério','Romance','Suspense','Terror','Faroeste'] },
+];
+const genres = genreGroups.flatMap(g => g.items);
 
 async function renderSearch(filter) {
   const title = document.getElementById('searchPageTitle');
@@ -1577,7 +1617,12 @@ async function renderSearch(filter) {
   else if (activeFilter === 'Recomendados') animes = animes.filter(a => a.recommended);
   else if (!['Todos'].includes(activeFilter)) animes = animes.filter(a => (a.genres||[]).includes(activeFilter));
   if (filtersEl) {
-    filtersEl.innerHTML = genres.map(g => `<button class="filter-btn${g===activeFilter?' active':''}" onclick="renderSearch('${g}')">${g}</button>`).join('');
+    const genreEmojis = {'Todos':'🌐','Filmes':'🎬','Séries':'📺','Lançamentos':'🆕','Populares':'🔥','Recomendados':'🍿','Ação':'⚔️','Aventura':'🗺️','Animação':'✨','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Ficção Científica':'🚀','Guerra':'🪖','História':'📜','Mistério':'🕵️','Romance':'❤️','Suspense':'🔍','Terror':'👻','Faroeste':'🤠'};
+    filtersEl.innerHTML = genreGroups.map(group =>
+      `<div style="display:contents">` +
+      group.items.map(g => `<button class="filter-btn${g===activeFilter?' active':''}" onclick="renderSearch('${g}')">${(genreEmojis[g]||'')} ${g}</button>`).join('') +
+      `</div>`
+    ).join('<div style="width:1px;height:28px;background:var(--border);margin:0 .25rem;align-self:center"></div>');
   }
   const count = document.getElementById('searchCount');
   if (count) count.textContent = animes.length + ' títulos encontrados';
@@ -1983,6 +2028,7 @@ function adminNav(section, el, extraId, extraId2) {
     episodes: (el) => renderAdminEpisodes(el, extraId, extraId2),
     addEp: (el) => renderAdminAddEp(el, extraId, extraId2),
     editEp: (el) => renderAdminEditEp(el, extraId),
+    genres: renderAdminGenres,
     heroBanner: renderAdminHeroBanner,
     users: renderAdminUsers,
     comments: renderAdminComments,
@@ -2735,6 +2781,43 @@ async function sendNotification() {
 async function deleteNotif(id) {
   await sb.from('notifications').delete().eq('id', id);
   adminNav('notifications', null);
+}
+
+async function renderAdminGenres(el) {
+  const allAnimes = await getAnimes();
+  const genreEmojis = {'Ação':'⚔️','Aventura':'🗺️','Animação':'✨','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Ficção Científica':'🚀','Guerra':'🪖','História':'📜','Mistério':'🕵️','Romance':'❤️','Suspense':'🔍','Terror':'👻','Faroeste':'🤠'};
+  const contentGenres = ['Ação','Aventura','Animação','Comédia','Crime','Documentário','Drama','Família','Fantasia','Ficção Científica','Guerra','História','Mistério','Romance','Suspense','Terror','Faroeste'];
+  const counts = {};
+  contentGenres.forEach(g => { counts[g] = allAnimes.filter(a => (a.genres||[]).includes(g)).length; });
+  const sorted = [...contentGenres].sort((a,b) => counts[b] - counts[a]);
+  el.innerHTML = `
+  <div class="admin-header-bar">
+    <div class="admin-page-title">🏷️ Gêneros do Catálogo</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:2rem">
+    ${sorted.map(g => {
+      const count = counts[g];
+      const pct = allAnimes.length > 0 ? Math.round((count/allAnimes.length)*100) : 0;
+      const isAnim = g === 'Animação';
+      return `<div style="background:var(--card);border:1px solid ${isAnim?'rgba(192,132,252,0.35)':'var(--border)'};border-radius:var(--radius);padding:1.25rem;cursor:pointer;transition:all .2s"
+        onmouseover="this.style.borderColor='${isAnim?'rgba(192,132,252,0.7)':'rgba(201,168,76,0.5)'}'" onmouseout="this.style.borderColor='${isAnim?'rgba(192,132,252,0.35)':'var(--border)'}'"
+        onclick="adminAnimeFilter='Todos';navigate('search','${g}')">
+        <div style="font-size:2rem;margin-bottom:.5rem">${genreEmojis[g]||'🎬'}</div>
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem;color:${isAnim?'#c084fc':'var(--text)'}">${g}</div>
+        <div style="font-size:.75rem;color:var(--text3);margin-bottom:.75rem">${count} título${count!==1?'s':''} · ${pct}% do catálogo</div>
+        <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${isAnim?'linear-gradient(90deg,#a855f7,#c084fc)':'var(--grad)'};border-radius:2px;transition:width .8s ease"></div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div class="admin-section-card">
+    <div class="admin-section-title">Como adicionar títulos por gênero</div>
+    <p style="font-size:.85rem;color:var(--text2);line-height:1.75">Para classificar um título em um gênero, vá em <strong>Gerenciar Títulos</strong>, abra o título desejado e preencha o campo <em>"Gêneros (separados por vírgula)"</em> com os gêneros desejados — ex: <span style="font-family:monospace;background:var(--bg3);padding:.1rem .4rem;border-radius:4px;font-size:.8rem">Animação, Ação, Aventura</span>. Os gêneros disponíveis são:</p>
+    <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.75rem">
+      ${contentGenres.map(g=>`<span style="padding:.3rem .8rem;border-radius:6px;font-size:.75rem;font-weight:600;background:rgba(201,168,76,0.07);color:var(--gold);border:1px solid rgba(201,168,76,0.2)">${genreEmojis[g]||''} ${g}</span>`).join('')}
+    </div>
+  </div>`;
 }
 
 function renderAdminSettings(el) {
