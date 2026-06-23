@@ -154,6 +154,8 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 #page-detail{padding-top:68px}
 .detail-hero{position:relative;min-height:420px;overflow:hidden}
 .detail-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(30,58,95,0.35) 0%,transparent 60%),linear-gradient(160deg,#07090f 40%,#0d1a2e 100%)}
+.detail-banner-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;z-index:0;opacity:.22;pointer-events:none}
+.detail-banner-overlay{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(7,9,15,0.97) 30%,rgba(7,9,15,0.6) 65%,rgba(7,9,15,0.35) 100%),linear-gradient(to top,rgba(7,9,15,0.9) 0%,transparent 50%)}
 .detail-bg-emoji{position:absolute;right:2rem;top:50%;transform:translateY(-50%);font-size:14rem;opacity:.04;pointer-events:none}
 .detail-content{position:relative;z-index:2;display:grid;grid-template-columns:auto 1fr;gap:2.5rem;padding:3rem 2rem 2rem;max-width:1600px;margin:0 auto}
 .detail-poster{width:200px;border-radius:14px;overflow:hidden;flex-shrink:0;background:var(--card);border:1px solid var(--border);aspect-ratio:2/3;display:flex;align-items:center;justify-content:center;font-size:5rem}
@@ -829,6 +831,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <div id="page-detail" class="page">
   <div class="detail-hero">
     <div class="detail-bg"></div>
+    <img id="detailBannerImg" class="detail-banner-img" src="" alt="" style="display:none" onerror="this.style.display='none'">
+    <div class="detail-banner-overlay" id="detailBannerOverlay" style="display:none"></div>
     <div class="detail-bg-emoji" id="detailBgEmoji"></div>
     <div class="detail-content">
       <div class="detail-poster" id="detailPoster">🎬</div>
@@ -857,7 +861,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <div class="episodes-section" id="episodesSection">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
       <div class="section-title" id="episodesSectionTitle">Episódios</div>
-      <select class="form-select" style="width:auto;padding:.4rem .85rem;font-size:.85rem" id="seasonSelect" onchange="renderEpisodes()">
+      <select class="form-select" style="width:auto;padding:.4rem .85rem;font-size:.85rem" id="seasonSelect" onchange="renderEpisodes(parseInt(this.value.replace('Temporada ','')))">
         <option>Temporada 1</option>
       </select>
     </div>
@@ -1884,6 +1888,20 @@ async function renderDetail(id) {
   anime.genres = anime.genres || [];
   anime.desc = anime.description;
   document.getElementById('detailBgEmoji').textContent = anime.emoji;
+  // Banner de fundo da página de detalhe
+  const bannerImg = document.getElementById('detailBannerImg');
+  const bannerOverlay = document.getElementById('detailBannerOverlay');
+  if (bannerImg && bannerOverlay) {
+    if (anime.banner_url && /^https?:\/\//i.test(anime.banner_url)) {
+      bannerImg.src = anime.banner_url;
+      bannerImg.style.display = 'block';
+      bannerOverlay.style.display = 'block';
+    } else {
+      bannerImg.src = '';
+      bannerImg.style.display = 'none';
+      bannerOverlay.style.display = 'none';
+    }
+  }
   const posterEl = document.getElementById('detailPoster');
   if (anime.poster) {
     posterEl.innerHTML = `<img class="detail-poster-img" src="${anime.poster}" alt="${sanitize(anime.title)}" onerror="this.parentElement.textContent='${anime.emoji}'">`;
@@ -1920,19 +1938,24 @@ async function renderDetail(id) {
   renderEpisodes();
 }
 
-async function renderEpisodes() {
+async function renderEpisodes(forceSeason) {
   const { data: anime } = await sb.from('animes').select('type,genres').eq('id', currentAnimeId).single();
   const movie = anime ? isAnimeMovie(anime) : false;
   const seasonSel = document.getElementById('seasonSelect');
-  const selectedSeason = parseInt(seasonSel?.value?.replace('Temporada ','')) || 1;
+  // Lê o valor ANTES de reconstruir o select
+  const selectedSeason = forceSeason != null
+    ? parseInt(forceSeason)
+    : (parseInt(seasonSel?.value?.replace('Temporada ','')) || 1);
   const { data: allEps } = await sb.from('episodes').select('season').eq('anime_id', currentAnimeId);
   const seasons = [...new Set((allEps||[]).map(e => e.season||1))].sort((a,b)=>a-b);
   if (seasonSel) {
     seasonSel.innerHTML = seasons.length > 0
-      ? seasons.map(s => `<option value="Temporada ${s}">Temporada ${s}</option>`).join('')
+      ? seasons.map(s => `<option value="Temporada ${s}"${s===selectedSeason?' selected':''}>Temporada ${s}</option>`).join('')
       : '<option>Temporada 1</option>';
   }
   const activeSeason = seasons.length > 0 ? (seasons.includes(selectedSeason) ? selectedSeason : seasons[0]) : 1;
+  // Garante que o select mostre a temporada correta após rebuild
+  if (seasonSel) seasonSel.value = `Temporada ${activeSeason}`;
   const { data: eps } = await sb.from('episodes').select('*')
     .eq('anime_id', currentAnimeId).eq('season', activeSeason).order('num', { ascending: true });
   const grid = document.getElementById('epsGrid');
@@ -2705,6 +2728,11 @@ async function adminEditAnime(id) {
       <div class="form-group"><label class="form-label">URL da Capa</label><input class="form-input" id="ePoster" value="${anime.poster||''}" placeholder="https://imagem.jpg" oninput="document.getElementById('ePosterPrev').style.display=this.value?'block':'none';document.getElementById('ePosterImg').src=this.value">
         <div id="ePosterPrev" style="margin-top:.5rem;${anime.poster?'':'display:none'}"><img id="ePosterImg" src="${anime.poster||''}" style="width:80px;height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
       </div>
+      <div class="form-group">
+        <label class="form-label">URL do Banner da Página <span style="color:var(--text3);font-weight:400;font-size:.7rem">(imagem de fundo na tela do título)</span></label>
+        <input class="form-input" id="eBanner" value="${anime.banner_url||''}" placeholder="https://imagem-banner.jpg (recomendado: 1280×720px ou maior)" oninput="document.getElementById('eBannerPrev').style.display=this.value?'block':'none';document.getElementById('eBannerImg').src=this.value">
+        <div id="eBannerPrev" style="margin-top:.5rem;${anime.banner_url?'':'display:none'}"><img id="eBannerImg" src="${anime.banner_url||''}" style="width:100%;max-width:360px;height:100px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
+      </div>
       <div class="form-group"><label class="form-label">Descrição</label><textarea class="form-textarea" id="eDesc">${sanitize(anime.description||'')}</textarea></div>
       <div class="form-row">
         <div class="form-group" id="eStatusGroup"><label class="form-label">Status</label><select class="form-select" id="eStatus"><option${anime.status==='Em andamento'?' selected':''}>Em andamento</option><option${anime.status==='Completo'?' selected':''}>Completo</option><option${anime.status==='Hiato'?' selected':''}>Hiato</option></select></div>
@@ -2736,12 +2764,15 @@ async function adminEditAnime(id) {
 async function saveEditAnime(id) {
   const type = document.getElementById('eType').value || 'serie';
   const posterUrl = document.getElementById('ePoster')?.value?.trim() || '';
+  const bannerUrl = document.getElementById('eBanner')?.value?.trim() || '';
   if (!isSafeUrl(posterUrl)) { showNotif('❌ URL da capa inválida. Use um link http(s) válido.', 'error'); return; }
+  if (bannerUrl && !isSafeUrl(bannerUrl)) { showNotif('❌ URL do banner inválida. Use um link http(s) válido.', 'error'); return; }
   await sb.from('animes').update({
     title: sanitize(document.getElementById('eTitle').value.trim()),
     type: type,
     emoji: document.getElementById('eEmoji').value,
     poster: posterUrl,
+    banner_url: bannerUrl || null,
     description: sanitize(document.getElementById('eDesc').value.trim()),
     status: document.getElementById('eStatus').value,
     episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('eEps').value) || 0),
@@ -2780,6 +2811,10 @@ function renderAdminAddAnime(el) {
         <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="aEmoji" placeholder="🎬" value="🎬"></div>
       </div>
       <div class="form-group"><label class="form-label">URL da Capa</label><input class="form-input" id="aPoster" placeholder="https://imagem.jpg"></div>
+      <div class="form-group">
+        <label class="form-label">URL do Banner da Página <span style="color:var(--text3);font-weight:400;font-size:.7rem">(imagem de fundo na tela do título)</span></label>
+        <input class="form-input" id="aBanner" placeholder="https://imagem-banner.jpg (recomendado: 1280×720px ou maior)">
+      </div>
       <div class="form-group"><label class="form-label">Descrição *</label><textarea class="form-textarea" id="aDesc" placeholder="Sinopse..."></textarea></div>
       <div class="form-row">
         <div class="form-group" id="aStatusGroup"><label class="form-label">Status</label><select class="form-select" id="aStatus"><option>Em andamento</option><option>Completo</option><option>Hiato</option></select></div>
@@ -2814,12 +2849,15 @@ async function saveNewAnime() {
   const posterUrl = document.getElementById('aPoster').value.trim();
   if (!title || !desc) { showNotif('❌ Título e descrição são obrigatórios.', 'error'); return; }
   if (!isSafeUrl(posterUrl)) { showNotif('❌ URL da capa inválida. Use um link http(s) válido.', 'error'); return; }
+  const bannerUrl = document.getElementById('aBanner')?.value?.trim() || '';
+  if (bannerUrl && !isSafeUrl(bannerUrl)) { showNotif('❌ URL do banner inválida. Use um link http(s) válido.', 'error'); return; }
   const type = document.getElementById('aType').value || 'serie';
   const { error } = await sb.from('animes').insert({
     title: sanitize(title),
     type: type,
     emoji: document.getElementById('aEmoji').value || '🎬',
     poster: posterUrl,
+    banner_url: bannerUrl || null,
     genres: document.getElementById('aGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
     status: document.getElementById('aStatus').value,
     episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('aEps').value) || 1),
@@ -3358,9 +3396,10 @@ function applyHeroBanner(d) {
   // Atualiza botões do hero conforme o animeId do banner
   if (btns) {
     if (d.animeId) {
+      const aid = d.animeId;
       btns.innerHTML = `
-        <button class="btn-play" onclick="navigate('detail',null,${JSON.stringify(d.animeId)})">▶ Assistir Agora</button>
-        <button class="btn-outline" onclick="navigate('detail',null,${JSON.stringify(d.animeId)})">ℹ️ Mais Detalhes</button>`;
+        <button class="btn-play" onclick="navigate('detail',${JSON.stringify(aid)})">▶ Assistir Agora</button>
+        <button class="btn-outline" onclick="navigate('detail',${JSON.stringify(aid)})">ℹ️ Mais Detalhes</button>`;
     } else {
       btns.innerHTML = `
         <button class="btn-play" onclick="navigate('search')">▶ Começar a assistir</button>
