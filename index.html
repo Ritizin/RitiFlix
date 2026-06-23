@@ -3348,7 +3348,7 @@ async function adminSaveHeroBannerItem(id) {
     title2: document.getElementById('bannerTitle2').value,
     title3: document.getElementById('bannerTitle3').value,
     desc: document.getElementById('bannerDesc').value,
-    animeId: document.getElementById('bannerAnimeId').value.trim() || null
+    animeId: (() => { const v = document.getElementById('bannerAnimeId').value.trim(); if (!v) return null; const n = Number(v); return isNaN(n) ? v : n; })()
   };
   const settings = window._heroBannerSettings || await fetchHeroBannerSettings();
   if (id) {
@@ -3395,11 +3395,12 @@ function applyHeroBanner(d) {
   if (desc) desc.textContent = d.desc || desc.textContent;
   // Atualiza botões do hero conforme o animeId do banner
   if (btns) {
-    if (d.animeId) {
-      const aid = d.animeId;
+    const rawId = d.animeId;
+    const aid = rawId ? (isNaN(Number(rawId)) ? null : Number(rawId)) || rawId : null;
+    if (aid) {
       btns.innerHTML = `
-        <button class="btn-play" onclick="navigate('detail',${JSON.stringify(aid)})">▶ Assistir Agora</button>
-        <button class="btn-outline" onclick="navigate('detail',${JSON.stringify(aid)})">ℹ️ Mais Detalhes</button>`;
+        <button class="btn-play" onclick="navigate('detail',${aid})">▶ Assistir Agora</button>
+        <button class="btn-outline" onclick="navigate('detail',${aid})">ℹ️ Mais Detalhes</button>`;
     } else {
       btns.innerHTML = `
         <button class="btn-play" onclick="navigate('search')">▶ Começar a assistir</button>
