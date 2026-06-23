@@ -1467,15 +1467,24 @@ function navigate(page, filter) {
   });
   currentPage = page;
   if (page === 'home') {
+    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
+    isPlaying = false;
     document.getElementById('page-home').classList.add('active');
     renderHome(); window.scrollTo(0,0);
   } else if (page === 'search') {
+    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
+    isPlaying = false;
     document.getElementById('page-search').classList.add('active');
     renderSearch(filter); window.scrollTo(0,0);
   } else if (page === 'detail') {
+    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
+    isPlaying = false;
+    currentAnimeId = null; currentEpId = null;
     document.getElementById('page-detail').classList.add('active');
     renderDetail(filter); window.scrollTo(0,0);
   } else if (page === 'player') {
+    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
+    isPlaying = false;
     document.getElementById('page-player').classList.add('active');
     renderPlayer(filter); window.scrollTo(0,0);
   } else if (page === 'admin') {
@@ -1619,7 +1628,7 @@ async function renderContinue(animes) {
     }).slice(0, 5);
     if (items.length === 0) { section.style.display = 'none'; grid.innerHTML = ''; return; }
     section.style.display = 'block';
-    grid.innerHTML = '<div class="history-list">' + items.map(h => historyItemHTML(h, 'detail')).join('') + '</div>';
+    grid.innerHTML = '<div class="history-list">' + items.map(h => historyItemHTML(h, 'player')).join('') + '</div>';
   } catch (e) {
     console.error('renderContinue error:', e);
     section.style.display = 'none';
