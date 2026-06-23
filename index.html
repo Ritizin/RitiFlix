@@ -805,10 +805,6 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="player-info-bar">
       <h2 id="playerAnimeTitle"></h2>
       <p id="playerEpTitle"></p>
-      <span id="sfApiBadge" style="display:none;margin-top:.3rem;align-items:center;gap:.35rem;font-size:.7rem;background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.35);color:var(--gold);border-radius:20px;padding:.2rem .7rem;width:fit-content">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
-        SuperFlixAPI
-      </span>
     </div>
     <div class="comment-section" style="padding:0">
       <div class="section-title" style="margin-bottom:1.25rem">💬 Comentários</div>
@@ -1093,11 +1089,6 @@ async function fillFormFromTmdb(result, formPrefix) {
     const emojiMap = {'Ação':'⚔️','Aventura':'🗺️','Animação':'🎌','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Terror':'👻','Romance':'❤️','Ficção Científica':'🚀','Suspense':'🎯','Mistério':'🕵️','Guerra':'🪖','Música':'🎵','Filme':'🎬','Série':'📺','Faroeste':'🤠','História':'📜','Ação & Aventura':'⚔️','Infanto-juvenil':'🧒'};
     const mainGenre = genres.find(g => emojiMap[g]) || '';
     set('Emoji', emojiMap[mainGenre] || '🎬');
-    set('TmdbId', result.id);
-    set('TmdbIdVisible', result.id);
-    // Atualiza badge de TMDB ID visível no form
-    const badge = document.getElementById(P+'TmdbBadge');
-    if (badge) { badge.textContent = '✓ ID ' + result.id + ' capturado'; badge.style.display='inline-block'; }
     if (details.vote_count > 500) setChecked('Popular', true);
     if (parseInt(year) >= 2024) setChecked('New', true);
     showNotif('✅ TMDb: dados preenchidos automaticamente!', 'success');
@@ -1134,10 +1125,6 @@ function tmdbSearchBlockHTML() {
       <div id="tmdbDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg3);border:1px solid rgba(201,168,76,0.25);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,0.55);z-index:400;max-height:340px;overflow-y:auto"></div>
     </div>
     <div style="font-size:.71rem;color:var(--text3);margin-top:.5rem">Selecione um resultado para preencher automaticamente poster, sinopse, nota, gêneros e mais.</div>
-    <div style="margin-top:.6rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-      <span id="_tmdbBadgePlaceholder" style="display:none"></span>
-      <span style="font-size:.7rem;color:var(--text3)">💡 O TMDB ID é salvo automaticamente e usado para reprodução via <strong style="color:var(--gold)">SuperFlixAPI</strong>.</span>
-    </div>
   </div>`;
 }
 
@@ -1868,14 +1855,15 @@ function loadVideoUrl(videoUrl) {
     } else { video.src = safeUrl; }
     return;
   }
-  // URL de frame/embed — criado via DOM API, não via innerHTML com a URL crua
+  // URL de frame/embed (ex: https://fembed.sx/e/533535) — criado via DOM API, não via innerHTML com a URL crua
   container.innerHTML = '';
   const iframe = document.createElement('iframe');
   iframe.src = safeUrl;
-  iframe.style.cssText = 'width:100%;height:70vh;max-height:70vh;background:#000;border:none;display:block';
+  iframe.style.cssText = 'width:100%;height:70vh;max-height:70vh;background:#000;border:none';
   iframe.allowFullscreen = true;
-  iframe.setAttribute('allow', 'autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *; web-share *');
+  iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media');
   iframe.setAttribute('referrerpolicy', 'no-referrer');
+  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups');
   container.appendChild(iframe);
 }
 
@@ -1918,25 +1906,7 @@ async function renderPlayer(data) {
     }
   }
   renderComments();
-  // SuperFlixAPI: se o título tem tmdb_id, usa o player SuperFlix; senão usa video_url
-  let _videoSrc = ep.video_url || '';
-  if (anime.tmdb_id) {
-    const _sfType = (anime.type === 'filme') ? 'filme' : 'serie';
-    if (_sfType === 'filme') {
-      _videoSrc = 'https://superflixapi.cyou/filme/' + anime.tmdb_id;
-    } else {
-      const _s = ep.season || 1;
-      const _e = ep.num || 1;
-      _videoSrc = 'https://superflixapi.cyou/serie/' + anime.tmdb_id + '/' + _s + '/' + _e;
-    }
-    // Mostra badge SuperFlixAPI abaixo do título do player
-    const sfBadgeEl = document.getElementById('sfApiBadge');
-    if (sfBadgeEl) { sfBadgeEl.style.display = 'inline-flex'; }
-  } else {
-    const sfBadgeEl = document.getElementById('sfApiBadge');
-    if (sfBadgeEl) { sfBadgeEl.style.display = 'none'; }
-  }
-  loadVideoUrl(_videoSrc);
+  loadVideoUrl(ep.video_url || '');
   const ci = document.getElementById('commentInput');
   const ncl = document.getElementById('noCommentLogin');
   if (currentUser) { ci.classList.remove('hidden'); ncl.style.display = 'none'; }
@@ -2288,12 +2258,6 @@ async function adminEditAnime(id) {
         <div class="form-group"><label class="form-label">Nota (0-10)</label><input type="number" step=".1" class="form-input" id="eScore" value="${anime.score}"></div>
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="eGenres" value="${anime.genres.filter(g=>g!=='Filme'&&g!=='Série').join(', ')}"></div>
-      <div class="form-group" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
-        <input type="hidden" id="eTmdbId" value="${anime.tmdb_id||''}">
-        <span style="font-size:.75rem;color:var(--text3)">🎬 TMDB ID:</span>
-        <input class="form-input" id="eTmdbIdVisible" value="${anime.tmdb_id||''}" placeholder="Ex: 550" style="max-width:220px;font-size:.82rem" oninput="document.getElementById('eTmdbId').value=this.value.trim()">
-        <span id="eTmdbBadge" style="${anime.tmdb_id?'':'display:none'};font-size:.72rem;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:var(--gold);border-radius:6px;padding:.2rem .6rem">${anime.tmdb_id?'✓ SuperFlixAPI ativo':''}</span>
-      </div>
       <div class="form-group">
         <label class="form-label">Visibilidade na Home</label>
         <div class="toggle-chips">
@@ -2316,7 +2280,6 @@ async function saveEditAnime(id) {
   const type = document.getElementById('eType').value || 'serie';
   const posterUrl = document.getElementById('ePoster')?.value?.trim() || '';
   if (!isSafeUrl(posterUrl)) { showNotif('❌ URL da capa inválida. Use um link http(s) válido.', 'error'); return; }
-  const eTmdbIdRaw = parseInt(document.getElementById('eTmdbId').value) || null;
   await sb.from('animes').update({
     title: sanitize(document.getElementById('eTitle').value.trim()),
     type: type,
@@ -2333,7 +2296,6 @@ async function saveEditAnime(id) {
     popular: document.getElementById('ePopular').checked,
     trending: document.getElementById('eTrending').checked,
     recommended: document.getElementById('eRecommended').checked,
-    tmdb_id: eTmdbIdRaw,
   }).eq('id', id);
   showNotif('✅ Título atualizado!', 'success');
   adminNav('animes', null);
@@ -2371,12 +2333,6 @@ function renderAdminAddAnime(el) {
         <div class="form-group"><label class="form-label">Nota inicial (0-10)</label><input type="number" step=".1" class="form-input" id="aScore" value="8.0"></div>
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="aGenres" placeholder="Ação, Aventura"></div>
-      <div class="form-group" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
-        <input type="hidden" id="aTmdbId" value="">
-        <span style="font-size:.75rem;color:var(--text3)">🎬 TMDB ID:</span>
-        <input class="form-input" id="aTmdbIdVisible" placeholder="Ex: 550 (preenchido ao buscar no TMDb)" style="max-width:220px;font-size:.82rem" oninput="document.getElementById('aTmdbId').value=this.value.trim()">
-        <span id="aTmdbBadge" style="display:none;font-size:.72rem;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:var(--gold);border-radius:6px;padding:.2rem .6rem"></span>
-      </div>
       <div class="form-group">
         <label class="form-label">Visibilidade na Home</label>
         <div class="toggle-chips">
@@ -2402,7 +2358,6 @@ async function saveNewAnime() {
   if (!title || !desc) { showNotif('❌ Título e descrição são obrigatórios.', 'error'); return; }
   if (!isSafeUrl(posterUrl)) { showNotif('❌ URL da capa inválida. Use um link http(s) válido.', 'error'); return; }
   const type = document.getElementById('aType').value || 'serie';
-  const tmdbIdRaw = parseInt(document.getElementById('aTmdbId').value) || null;
   const { error } = await sb.from('animes').insert({
     title: sanitize(title),
     type: type,
@@ -2419,7 +2374,6 @@ async function saveNewAnime() {
     popular: document.getElementById('aPopular').checked,
     trending: document.getElementById('aTrending').checked,
     recommended: document.getElementById('aRecommended').checked,
-    tmdb_id: tmdbIdRaw,
   });
   if (error) { showNotif('❌ Erro: ' + error.message, 'error'); return; }
   showNotif((type==='filme'?'🎬':'📺') + ' Título "' + sanitize(title) + '" publicado!', 'success');
@@ -2435,7 +2389,6 @@ async function renderAdminMovieVideo(el, animeId) {
   const { data: eps } = await sb.from('episodes').select('*').eq('anime_id', animeId).eq('season', 1).eq('num', 1).order('id', { ascending: true });
   const ep = eps && eps.length > 0 ? eps[0] : null;
   const extraCount = eps ? eps.length - 1 : 0;
-  const sfPreviewUrl = anime.tmdb_id ? 'https://superflixapi.cyou/filme/' + anime.tmdb_id : '';
   el.innerHTML = `
   <div class="admin-header-bar">
     <div>
@@ -2444,33 +2397,11 @@ async function renderAdminMovieVideo(el, animeId) {
     </div>
   </div>
   <div class="admin-form">
-    ${anime.tmdb_id ? `
-    <div class="admin-section-card" style="border-color:rgba(201,168,76,0.35)">
-      <div class="admin-section-title" style="color:var(--gold)">⚡ SuperFlixAPI — Player Ativo</div>
-      <div style="font-size:.82rem;color:var(--text2);margin-bottom:1rem">
-        Este título tem <strong>TMDB ID: ${anime.tmdb_id}</strong>. O player usará automaticamente a SuperFlixAPI para reprodução.
-        A URL do vídeo manual abaixo será ignorada enquanto o TMDB ID estiver definido.
-      </div>
-      <div style="background:#000;border-radius:10px;overflow:hidden;margin-bottom:.75rem">
-        <iframe src="${sfPreviewUrl}" width="100%" height="340" frameborder="0"
-          allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *"
-          allowfullscreen style="display:block"></iframe>
-      </div>
-      <div style="font-size:.72rem;color:var(--text3)">
-        🔗 URL gerada: <code style="color:var(--gold)">${sfPreviewUrl}</code><br>
-        Para desativar a SuperFlixAPI, edite o título e apague o TMDB ID.
-      </div>
-    </div>` : `
-    <div class="admin-section-card" style="border-color:rgba(201,168,76,0.15)">
-      <div style="font-size:.82rem;color:var(--text3);margin-bottom:.5rem">
-        💡 <strong style="color:var(--gold)">Dica SuperFlixAPI:</strong> Edite este título e adicione o TMDB ID para ativar o player automático sem precisar de URL de vídeo manual.
-      </div>
-    </div>`}
     <div class="admin-section-card">
-      <div class="admin-section-title">🎬 Vídeo manual${anime.tmdb_id?' <span style="font-size:.72rem;font-weight:400;color:var(--text3)">(opcional — SuperFlixAPI tem prioridade)</span>':''}</div>
+      <div class="admin-section-title">🎬 Vídeo do filme</div>
       <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.25rem">${ep && ep.video_url ? '<span style="color:#4ade80">✓ Este filme já tem um vídeo cadastrado.</span>' : 'Nenhum vídeo cadastrado ainda. Cole a URL abaixo para publicar.'}</div>
       ${extraCount > 0 ? `<div style="font-size:.78rem;color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:.6rem .9rem;margin-bottom:1rem">⚠️ Encontramos ${extraCount} registro(s) de vídeo duplicado(s) para este filme — isso pode fazer o player carregar o vídeo errado. Ao salvar, os duplicados serão removidos automaticamente.</div>` : ''}
-      <div class="form-group"><label class="form-label">URL do vídeo${anime.tmdb_id?' (opcional)':' *'}</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame)"></div>
+      <div class="form-group"><label class="form-label">URL do vídeo *</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame, ex: https://fembed.sx/e/533535)"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Duração</label><input class="form-input" id="mvDur" value="${ep?.duration||'01:45:00'}" placeholder="01:45:00"></div>
         <div class="form-group"><label class="form-label">URL da Miniatura (opcional)</label><input class="form-input" id="mvThumb" value="${ep?.thumbnail_url||''}" placeholder="https://imagem-thumb.jpg"></div>
@@ -2486,12 +2417,9 @@ async function renderAdminMovieVideo(el, animeId) {
 async function saveMovieVideo(animeId, epId) {
   const videoUrl = document.getElementById('mvUrl').value.trim();
   const thumbUrl = document.getElementById('mvThumb').value.trim();
-  // busca tmdb_id do anime para saber se URL do vídeo é obrigatória
-  const { data: _mvAnime } = await sb.from('animes').select('tmdb_id').eq('id', animeId).single();
-  const hasTmdb = !!(_mvAnime && _mvAnime.tmdb_id);
-  if (!videoUrl && !hasTmdb) { showNotif('❌ Cole a URL do vídeo (ou ative a SuperFlixAPI adicionando o TMDB ID ao título).', 'error'); return; }
-  if (videoUrl && !isSafeUrl(videoUrl)) { showNotif('❌ URL de vídeo inválida. Use um link http(s) válido.', 'error'); return; }
-  if (thumbUrl && !isSafeUrl(thumbUrl)) { showNotif('❌ URL de thumbnail inválida. Use um link http(s) válido.', 'error'); return; }
+  if (!videoUrl) { showNotif('❌ Cole a URL do vídeo.', 'error'); return; }
+  if (!isSafeUrl(videoUrl)) { showNotif('❌ URL de vídeo inválida. Use um link http(s) válido.', 'error'); return; }
+  if (!isSafeUrl(thumbUrl)) { showNotif('❌ URL de thumbnail inválida. Use um link http(s) válido.', 'error'); return; }
   const { data: anime } = await sb.from('animes').select('title, emoji').eq('id', animeId).single();
   const payload = {
     anime_id: animeId,
