@@ -364,7 +364,7 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .real-player-wrap{position:relative;width:100%;background:#000;border-radius:14px;overflow:hidden}
 .real-player-wrap video{display:block;width:100%;max-height:70vh;background:#000}
 .rpc{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.98) 0%,rgba(0,0,0,.6) 60%,transparent 100%);padding:1.2rem 1rem .6rem;opacity:0;transition:opacity .25s;pointer-events:none}
-.real-player-wrap:hover .rpc,.real-player-wrap.show-ctrl .rpc{opacity:1;pointer-events:auto}
+.real-player-wrap:hover .rpc,.real-player-wrap.show-ctrl .rpc,.real-player-wrap.paused .rpc{opacity:1;pointer-events:auto}
 .rpc-progress{width:100%;height:4px;background:rgba(255,255,255,.18);border-radius:2px;cursor:pointer;margin-bottom:.8rem;position:relative;transition:height .15s}
 .rpc-progress:hover{height:7px}
 .rpc-progress-fill{position:absolute;left:0;top:0;height:100%;background:var(--grad);border-radius:2px;pointer-events:none;transition:width .1s linear}
@@ -409,7 +409,20 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .bell-item .bell-msg{color:var(--text);margin-bottom:.2rem}
 .bell-item .bell-time{font-size:.72rem;color:var(--text3)}
 .bell-empty{padding:1.25rem;text-align:center;font-size:.85rem;color:var(--text3)}
-/* ── DETAIL: real poster image ── */
+/* ── IFRAME PLAYER CONTROLS ── */
+.iframe-player-wrap{width:100%;border-radius:14px;overflow:hidden;background:#000}
+.iframe-player-wrap iframe{display:block;width:100%;height:70vh;max-height:70vh;border:none}
+.iframe-controls{background:linear-gradient(135deg,#0d1117,#131924);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;padding:.75rem 1.25rem}
+.iframe-ctrl-bar{width:100%;height:4px;background:rgba(255,255,255,.12);border-radius:2px;cursor:pointer;margin-bottom:.75rem;position:relative;transition:height .15s}
+.iframe-ctrl-bar:hover{height:6px}
+.iframe-ctrl-fill{height:100%;background:var(--grad);border-radius:2px;width:0%;transition:width .5s linear}
+.iframe-ctrl-row{display:flex;align-items:center;gap:.5rem}
+.icbtn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:.9rem;padding:.45rem .75rem;border-radius:8px;line-height:1;transition:all .2s;font-family:'Outfit',sans-serif;font-weight:600;white-space:nowrap}
+.icbtn:hover{background:rgba(201,168,76,.18);border-color:var(--gold);color:var(--gold2)}
+.icbtn.icbtn-main{background:var(--grad);color:#07090f;border:none;padding:.45rem 1.1rem;font-size:1rem}
+.icbtn.icbtn-main:hover{opacity:.88;transform:scale(1.04)}
+.iframe-time{font-size:.82rem;color:rgba(255,255,255,.7);flex:1;font-variant-numeric:tabular-nums;text-align:center}
+.iframe-fullscreen{margin-left:auto}
 .detail-poster-img{width:100%;height:100%;object-fit:cover;border-radius:14px}
 /* ── SEARCH KEYBOARD SHORTCUT BADGE ── */
 .search-kbd{position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:var(--bg4);border:1px solid var(--border);border-radius:4px;font-size:.65rem;color:var(--text3);padding:.15rem .35rem;pointer-events:none;font-family:monospace;transition:opacity .2s}
@@ -1566,6 +1579,7 @@ function navigate(page, filter) {
   });
   currentPage = page;
   if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
+  if (typeof _iframeTimer !== 'undefined' && _iframeTimer) { clearInterval(_iframeTimer); _iframeTimer = null; }
   isPlaying = false; playerTime = 0;
   // Stop any active real video
   if (window._activeVideo) { try { window._activeVideo.pause(); } catch(e){} window._activeVideo = null; }
@@ -2106,18 +2120,31 @@ function loadVideoUrl(videoUrl, resumePct) {
     return;
   }
 
-  // Embed / iframe player
+  // Embed / iframe player com controles visuais
   const vpEl = document.getElementById('videoPlayer');
-  vpEl.innerHTML = '';
-  const iframe = document.createElement('iframe');
-  iframe.src = safeUrl;
-  iframe.style.cssText = 'width:100%;height:70vh;max-height:70vh;background:#000;border:none;border-radius:14px';
-  iframe.allowFullscreen = true;
-  iframe.setAttribute('allow','autoplay; fullscreen; encrypted-media');
-  iframe.setAttribute('referrerpolicy','no-referrer');
-  iframe.setAttribute('sandbox','allow-scripts allow-same-origin allow-presentation allow-popups');
-  vpEl.appendChild(iframe);
-  // For iframes we can't track time, but at least record the open as "in progress"
+  vpEl.style.aspectRatio = 'unset';
+  vpEl.style.height = 'auto';
+  vpEl.innerHTML = `
+    <div class="iframe-player-wrap" id="iframePlayerWrap">
+      <iframe id="iframeVideo" src="${safeUrl}"
+        allowfullscreen
+        allow="autoplay; fullscreen; encrypted-media"
+        referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"></iframe>
+    </div>
+    <div class="iframe-controls">
+      <div class="iframe-ctrl-bar" id="iframeBar" onclick="iframeSeek(event)">
+        <div class="iframe-ctrl-fill" id="iframeFill"></div>
+      </div>
+      <div class="iframe-ctrl-row">
+        <button class="icbtn" onclick="iframeSkip(-10)" title="Voltar 10s">⏪ -10s</button>
+        <button class="icbtn icbtn-main" id="iframePlayBtn" onclick="iframeTogglePlay()">⏸ Pausar</button>
+        <button class="icbtn" onclick="iframeSkip(10)" title="Avançar 10s">+10s ⏩</button>
+        <span class="iframe-time" id="iframeTime">00:00 / --:--</span>
+        <button class="icbtn iframe-fullscreen" onclick="iframeFullscreen()" title="Tela cheia">⛶ Tela cheia</button>
+      </div>
+    </div>`;
+  _startIframeTimer();
 }
 
 function _wireRealPlayer(video, resumePct) {
@@ -2361,6 +2388,77 @@ async function prevEp() {
 function toggleFullscreen() {
   const el = document.getElementById('videoPlayer');
   if (el && el.requestFullscreen) el.requestFullscreen();
+}
+
+// ── IFRAME PLAYER CONTROLS ──
+let _iframeTimer = null;
+let _iframeTime = 0;
+let _iframePlaying = true;
+let _iframeDuration = 0; // estimado via episódio
+
+function _startIframeTimer() {
+  if (_iframeTimer) clearInterval(_iframeTimer);
+  _iframePlaying = true;
+  _iframeTime = 0;
+  // Tenta pegar duração do episódio atual
+  _iframeDuration = 0;
+  if (currentEpId && sb) {
+    sb.from('episodes').select('duration').eq('id', currentEpId).single().then(({ data }) => {
+      if (data?.duration) {
+        const parts = data.duration.split(':').map(Number);
+        if (parts.length === 3) _iframeDuration = parts[0]*3600 + parts[1]*60 + parts[2];
+        else if (parts.length === 2) _iframeDuration = parts[0]*60 + parts[1];
+      }
+    });
+  }
+  _iframeTimer = setInterval(() => {
+    if (!_iframePlaying) return;
+    _iframeTime++;
+    const fill = document.getElementById('iframeFill');
+    const timeEl = document.getElementById('iframeTime');
+    if (fill && _iframeDuration > 0) fill.style.width = Math.min((_iframeTime/_iframeDuration)*100, 100) + '%';
+    if (timeEl) timeEl.textContent = _fmtIframeTime(_iframeTime) + (_iframeDuration > 0 ? ' / ' + _fmtIframeTime(_iframeDuration) : ' / --:--');
+    if (_iframeDuration > 0 && _iframeTime >= _iframeDuration) clearInterval(_iframeTimer);
+  }, 1000);
+}
+
+function _fmtIframeTime(sec) {
+  if (!sec || sec < 0) return '00:00';
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function iframeTogglePlay() {
+  _iframePlaying = !_iframePlaying;
+  const btn = document.getElementById('iframePlayBtn');
+  if (btn) btn.innerHTML = _iframePlaying ? '⏸ Pausar' : '▶ Reproduzir';
+}
+
+function iframeSkip(sec) {
+  _iframeTime = Math.max(0, _iframeTime + sec);
+  // Atualiza visual imediatamente
+  const fill = document.getElementById('iframeFill');
+  const timeEl = document.getElementById('iframeTime');
+  if (fill && _iframeDuration > 0) fill.style.width = Math.min((_iframeTime/_iframeDuration)*100, 100) + '%';
+  if (timeEl) timeEl.textContent = _fmtIframeTime(_iframeTime) + (_iframeDuration > 0 ? ' / ' + _fmtIframeTime(_iframeDuration) : ' / --:--');
+}
+
+function iframeSeek(e) {
+  if (!_iframeDuration) return;
+  const bar = document.getElementById('iframeBar');
+  const rect = bar.getBoundingClientRect();
+  _iframeTime = Math.floor(((e.clientX - rect.left) / rect.width) * _iframeDuration);
+  const fill = document.getElementById('iframeFill');
+  const timeEl = document.getElementById('iframeTime');
+  if (fill) fill.style.width = Math.min((_iframeTime/_iframeDuration)*100, 100) + '%';
+  if (timeEl) timeEl.textContent = _fmtIframeTime(_iframeTime) + ' / ' + _fmtIframeTime(_iframeDuration);
+}
+
+function iframeFullscreen() {
+  const wrap = document.getElementById('iframePlayerWrap') || document.getElementById('iframeVideo');
+  if (wrap?.requestFullscreen) wrap.requestFullscreen();
+  else if (document.getElementById('iframeVideo')?.requestFullscreen) document.getElementById('iframeVideo').requestFullscreen();
 }
 
 // ============================================================
