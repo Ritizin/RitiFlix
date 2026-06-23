@@ -13,7 +13,7 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <!-- Segurança: Content-Security-Policy restringe de onde scripts/estilos/conexões podem vir, mitigando XSS.
      frame-src é deixado amplo em https: pois o player precisa embutir provedores de vídeo variados cadastrados pelo admin. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org; frame-src https: https://superflixapi.rest https://superflixapi.cyou; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org https://superflixapi.rest https://superflixapi.cyou https://*.cloudflare.com https://challenges.cloudflare.com; frame-src https: https://superflixapi.rest https://superflixapi.cyou; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
 <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -2103,9 +2103,7 @@ function loadVideoUrl(videoUrl, resumePct) {
       <div class="iframe-player-wrap" id="iframePlayerWrap">
         <iframe id="iframeVideo" src="${sfUrl}"
           allowfullscreen
-          allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *; clipboard-write *; accelerometer *; gyroscope *; web-share *"
-          referrerpolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"></iframe>
+          allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *; clipboard-write *; accelerometer *; gyroscope *; web-share *; storage-access *"></iframe>
       </div>`;
     return;
   }
