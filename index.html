@@ -3207,6 +3207,41 @@ async function renderAdminHeroBanner(el) {
   </div>`}`;
 }
 
+let _bannerAnimeSearchTimer = null;
+async function searchBannerAnime(q) {
+  const results = document.getElementById('bannerAnimeResults');
+  if (!results) return;
+  clearTimeout(_bannerAnimeSearchTimer);
+  if (!q || q.length < 2) { results.style.display = 'none'; return; }
+  _bannerAnimeSearchTimer = setTimeout(async () => {
+    const { data } = await sb.from('animes').select('id,title,emoji').ilike('title','%'+q+'%').limit(8);
+    if (!data || data.length === 0) { results.innerHTML = '<div style="padding:.75rem 1rem;font-size:.8rem;color:var(--text3)">Nenhum título encontrado.</div>'; results.style.display = 'block'; return; }
+    results.innerHTML = data.map(a => `<div onclick="selectBannerAnime('${a.id}','${(a.emoji||'🎬').replace(/'/g,'')} ${(a.title||'').replace(/'/g,'').replace(/"/g,'')}')"
+      style="padding:.6rem 1rem;font-size:.85rem;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:.5rem"
+      onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
+      <span>${a.emoji||'🎬'}</span><span style="font-weight:600">${sanitize(a.title)}</span>
+    </div>`).join('');
+    results.style.display = 'block';
+  }, 280);
+}
+function selectBannerAnime(id, label) {
+  const input = document.getElementById('bannerAnimeId');
+  const search = document.getElementById('bannerAnimeSearch');
+  const selected = document.getElementById('bannerAnimeSelected');
+  const results = document.getElementById('bannerAnimeResults');
+  if (input) input.value = id;
+  if (search) search.value = label;
+  if (selected) selected.textContent = '🔗 Vinculado: ' + label;
+  if (results) results.style.display = 'none';
+}
+async function preloadBannerAnimeName(animeId) {
+  if (!animeId) return;
+  try {
+    const { data } = await sb.from('animes').select('id,title,emoji').eq('id', animeId).single();
+    if (data) selectBannerAnime(data.id, (data.emoji||'🎬') + ' ' + data.title);
+  } catch(e) {}
+}
+
 async function adminSaveHeroInterval() {
   const raw = parseInt(document.getElementById('heroIntervalInput').value, 10);
   const interval = isNaN(raw) ? 7 : Math.max(3, Math.min(60, raw));
@@ -3244,12 +3279,24 @@ function adminEditHeroBannerItem(id) {
       <div class="form-group"><label class="form-label">Linha 2 do título (destaque dourado)</label><input class="form-input" id="bannerTitle2" value="${item?.title2||''}"></div>
       <div class="form-group"><label class="form-label">Linha 3 do título</label><input class="form-input" id="bannerTitle3" value="${item?.title3||''}"></div>
       <div class="form-group"><label class="form-label">Descrição</label><textarea class="form-textarea" id="bannerDesc" style="min-height:80px">${item?.desc||''}</textarea></div>
+    </div>
+    <div class="admin-section-card">
+      <div class="admin-section-title">🔗 Link do título (opcional)</div>
+      <div class="form-group">
+        <label class="form-label">Vincular a um Filme / Série</label>
+        <input class="form-input" id="bannerAnimeSearch" placeholder="Digite o nome do filme ou série..." oninput="searchBannerAnime(this.value)" autocomplete="off">
+        <div id="bannerAnimeResults" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;margin-top:.35rem;display:none"></div>
+        <input type="hidden" id="bannerAnimeId" value="${item?.animeId||''}">
+        <div id="bannerAnimeSelected" style="margin-top:.5rem;font-size:.8rem;color:var(--gold);min-height:1.2em">${item?.animeId ? '🔗 Vinculado ao título ID: '+item.animeId : ''}</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Ao clicar em "Assistir Agora" ou no banner, o usuário será levado diretamente para este título.</div>
+      </div>
       <div style="display:flex;gap:.75rem">
         <button class="btn btn-red" onclick="adminSaveHeroBannerItem(${item ? `'${item.id}'` : 'null'})">💾 Salvar banner</button>
         <button class="btn btn-ghost" onclick="adminNav('heroBanner',null)">Cancelar</button>
       </div>
     </div>
   </div>`;
+  if (item?.animeId) setTimeout(() => preloadBannerAnimeName(item.animeId), 100);
 }
 
 async function adminSaveHeroBannerItem(id) {
@@ -3262,7 +3309,8 @@ async function adminSaveHeroBannerItem(id) {
     title1,
     title2: document.getElementById('bannerTitle2').value,
     title3: document.getElementById('bannerTitle3').value,
-    desc: document.getElementById('bannerDesc').value
+    desc: document.getElementById('bannerDesc').value,
+    animeId: document.getElementById('bannerAnimeId').value.trim() || null
   };
   const settings = window._heroBannerSettings || await fetchHeroBannerSettings();
   if (id) {
@@ -3295,6 +3343,7 @@ function applyHeroBanner(d) {
   const badge = hero.querySelector('.hero-badge');
   const title = hero.querySelector('.hero-title');
   const desc = hero.querySelector('.hero-desc');
+  const btns = hero.querySelector('.hero-btns');
   if (coverEl) {
     if (d.coverUrl && /^https?:\/\//i.test(d.coverUrl)) {
       coverEl.style.backgroundImage = `url('${d.coverUrl.replace(/['"\\]/g,'')}')`;
@@ -3306,6 +3355,18 @@ function applyHeroBanner(d) {
   if (badge) badge.textContent = d.badge || badge.textContent;
   if (title) title.innerHTML = `${sanitize(d.title1||'')}<br><span>${sanitize(d.title2||'')}</span><br>${sanitize(d.title3||'')}`;
   if (desc) desc.textContent = d.desc || desc.textContent;
+  // Atualiza botões do hero conforme o animeId do banner
+  if (btns) {
+    if (d.animeId) {
+      btns.innerHTML = `
+        <button class="btn-play" onclick="navigate('detail',null,${JSON.stringify(d.animeId)})">▶ Assistir Agora</button>
+        <button class="btn-outline" onclick="navigate('detail',null,${JSON.stringify(d.animeId)})">ℹ️ Mais Detalhes</button>`;
+    } else {
+      btns.innerHTML = `
+        <button class="btn-play" onclick="navigate('search')">▶ Começar a assistir</button>
+        <button class="btn-outline" onclick="navigate('search')">🔍 Explorar catálogo</button>`;
+    }
+  }
 }
 
 // Liga/reinicia o carrossel do hero com a lista de banners cadastrados no admin
