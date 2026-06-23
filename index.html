@@ -1466,25 +1466,27 @@ function navigate(page, filter) {
     if (a.getAttribute('data-page') === page) a.classList.add('active');
   });
   currentPage = page;
+  if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
+  isPlaying = false; playerTime = 0;
+  const _pc = document.getElementById('playerContent');
+  if (_pc) {
+    _pc.innerHTML = '<div class="player-thumb-emoji" id="playerEmoji">🎬</div><div class="player-title" id="playerTitle">Carregando...</div><button class="btn-play" style="margin-top:.5rem" id="playerPlayBtn" onclick="togglePlay()">▶ Reproduzir</button>';
+    _pc.style.display = 'flex';
+  }
+  const _pctrl = document.getElementById('playerControls');
+  if (_pctrl) _pctrl.style.display = 'none';
   if (page === 'home') {
-    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
-    isPlaying = false;
     document.getElementById('page-home').classList.add('active');
     renderHome(); window.scrollTo(0,0);
   } else if (page === 'search') {
-    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
-    isPlaying = false;
     document.getElementById('page-search').classList.add('active');
     renderSearch(filter); window.scrollTo(0,0);
   } else if (page === 'detail') {
-    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
-    isPlaying = false;
-    currentAnimeId = null; currentEpId = null;
+    currentAnimeId = parseInt(filter) || filter;
+    currentEpId = null;
     document.getElementById('page-detail').classList.add('active');
     renderDetail(filter); window.scrollTo(0,0);
   } else if (page === 'player') {
-    if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
-    isPlaying = false;
     document.getElementById('page-player').classList.add('active');
     renderPlayer(filter); window.scrollTo(0,0);
   } else if (page === 'admin') {
@@ -1878,6 +1880,28 @@ function loadVideoUrl(videoUrl) {
 
 async function renderPlayer(data) {
   if (!data) return;
+  // Reset completo do player antes de qualquer coisa
+  if (playerInterval) { clearInterval(playerInterval); playerInterval = null; }
+  isPlaying = false; playerTime = 0;
+  window._historySaveFailed = false;
+  // Limpa o conteúdo do player imediatamente para não exibir o vídeo anterior
+  const playerContentEl = document.getElementById('playerContent');
+  const playerControlsEl = document.getElementById('playerControls');
+  if (playerContentEl) {
+    playerContentEl.innerHTML = `
+      <div class="player-thumb-emoji" id="playerEmoji">🎬</div>
+      <div class="player-title" id="playerTitle">Carregando...</div>
+      <div style="font-size:.8rem;color:var(--text3);text-align:center;max-width:400px;line-height:1.6">Para ter um player de vídeo real, conecte uma CDN de vídeo ou utilize o sistema de upload no painel admin. Este player está totalmente pronto para integração.</div>
+      <button class="btn-play" style="margin-top:.5rem" id="playerPlayBtn" onclick="togglePlay()">▶ Reproduzir</button>`;
+    playerContentEl.style.display = 'flex';
+  }
+  if (playerControlsEl) {
+    playerControlsEl.style.display = 'none';
+    const fill = document.getElementById('progressFill');
+    if (fill) fill.style.width = '0%';
+    const time = document.getElementById('playerTime');
+    if (time) time.textContent = '00:00 / 45:00';
+  }
   const { animeId, epId } = data;
   currentAnimeId = animeId; currentEpId = epId;
   const { data: anime } = await sb.from('animes').select('*').eq('id', animeId).single();
@@ -1893,12 +1917,6 @@ async function renderPlayer(data) {
   const nextBtn = document.getElementById('nextEpBtn');
   if (prevBtn) prevBtn.style.display = movie ? 'none' : '';
   if (nextBtn) nextBtn.style.display = movie ? 'none' : '';
-  document.getElementById('playerContent').style.display = 'flex';
-  document.getElementById('playerControls').style.display = 'none';
-  document.getElementById('playerPlayBtn').textContent = '▶ Reproduzir';
-  isPlaying = false; playerTime = 0;
-  window._historySaveFailed = false;
-  if (playerInterval) clearInterval(playerInterval);
   if (currentUser && await ensureSession()) {
     try {
       const { data: existing, error: selErr } = await sb.from('watch_history').select('id').eq('user_id', currentUser.id).eq('episode_id', epId).maybeSingle();
