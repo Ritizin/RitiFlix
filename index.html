@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RitiFlix - Sua Plataforma de Filmes e Séries</title>
-<link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
-<link rel="icon" type="image/svg+xml" href="favicon.svg" />
-<link rel="shortcut icon" href="favicon.ico" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2307090f'/%3E%3Crect width='32' height='32' rx='7' fill='url(%23g)'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23c9a84c'/%3E%3Cstop offset='1' stop-color='%23f0d070'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ctext x='16' y='23' font-family='Georgia%2Cserif' font-size='19' font-weight='700' fill='%2307090f' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="RitiFlix" />
 <link rel="manifest" href="site.webmanifest" />
@@ -517,7 +515,10 @@ document.addEventListener('DOMContentLoaded', function() {
       <a onclick="navigate('search','Filmes')" data-page="movies">Filmes</a>
       <a onclick="navigate('search','Séries')" data-page="series">Séries</a>
       <a onclick="navigate('search','Lançamentos')" data-page="releases">Lançamentos</a>
-      <a onclick="navigate('search','Animação')" data-page="animation">✨ Animação</a>
+      <a onclick="navigate('search','Animação')" data-page="animation">Animação</a>
+      <a onclick="navigate('search','Ação')" data-page="acao">Ação</a>
+      <a onclick="navigate('search','Documentário')" data-page="documentarios">Documentários</a>
+      <a onclick="navigate('search','Terror')" data-page="terror">Terror</a>
       <a onclick="navigate('search','Populares')" data-page="popular">Populares</a>
     </div>
     <div class="nav-right">
@@ -557,7 +558,14 @@ document.addEventListener('DOMContentLoaded', function() {
   <a onclick="navigate('search','Filmes');closeMobileMenu()">🎬 Filmes</a>
   <a onclick="navigate('search','Séries');closeMobileMenu()">📺 Séries</a>
   <a onclick="navigate('search','Lançamentos');closeMobileMenu()">🆕 Lançamentos</a>
-  <a onclick="navigate('search','Animação');closeMobileMenu()">✨ Animação</a>
+  <a onclick="navigate('search','Animação');closeMobileMenu()">🎌 Animação</a>
+  <a onclick="navigate('search','Ação');closeMobileMenu()">⚔️ Ação</a>
+  <a onclick="navigate('search','Comédia');closeMobileMenu()">😂 Comédia</a>
+  <a onclick="navigate('search','Drama');closeMobileMenu()">🎭 Drama</a>
+  <a onclick="navigate('search','Terror');closeMobileMenu()">👻 Terror</a>
+  <a onclick="navigate('search','Documentário');closeMobileMenu()">🎥 Documentários</a>
+  <a onclick="navigate('search','Ficção Científica');closeMobileMenu()">🚀 Ficção Científica</a>
+  <a onclick="navigate('search','Romance');closeMobileMenu()">❤️ Romance</a>
   <a onclick="navigate('search','Populares');closeMobileMenu()">🔥 Populares</a>
   <div style="height:1px;background:var(--border);margin:.25rem 0"></div>
   <a onclick="openModal('login');closeMobileMenu()" id="mobileLoginLink">🔐 Entrar</a>
@@ -640,18 +648,74 @@ document.addEventListener('DOMContentLoaded', function() {
 
   <div class="section" style="background:linear-gradient(135deg,rgba(13,17,23,0.8),rgba(30,20,50,0.95));border-radius:16px;margin-bottom:2rem;border:1px solid rgba(160,100,255,0.12)">
     <div class="section-header">
-      <div class="section-title" style="color:#c084fc">✨ Animações</div>
+      <div class="section-title" style="color:#c084fc">🎌 Animações</div>
       <a class="see-all" style="color:#c084fc" onclick="navigate('search','Animação')">Ver todas →</a>
     </div>
     <div class="cards-grid" id="animacaoGrid"></div>
     <div id="animacaoEmpty" style="display:none;text-align:center;padding:2rem;color:var(--text3)">
-      <div style="font-size:2.5rem;margin-bottom:.5rem">✨</div>
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🎌</div>
       <p style="font-size:.9rem">Nenhuma animação cadastrada ainda.</p>
       <button class="btn btn-ghost" style="margin-top:.75rem;font-size:.8rem" onclick="navigate('admin')">+ Adicionar no Admin</button>
     </div>
   </div>
 
   <div class="section">
+    <div class="section-header">
+      <div class="section-title">⚔️ Ação</div>
+      <a class="see-all" onclick="navigate('search','Ação')">Ver todos →</a>
+    </div>
+    <div class="cards-grid" id="acaoGrid"></div>
+  </div>
+
+  <div class="section" style="background:var(--bg2);border-radius:16px;margin-bottom:2rem">
+    <div class="section-header">
+      <div class="section-title">😂 Comédia</div>
+      <a class="see-all" onclick="navigate('search','Comédia')">Ver todos →</a>
+    </div>
+    <div class="cards-grid" id="comediaGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">🎭 Drama</div>
+      <a class="see-all" onclick="navigate('search','Drama')">Ver todos →</a>
+    </div>
+    <div class="cards-grid" id="dramaGrid"></div>
+  </div>
+
+  <div class="section" style="background:var(--bg2);border-radius:16px;margin-bottom:2rem">
+    <div class="section-header">
+      <div class="section-title">👻 Terror</div>
+      <a class="see-all" onclick="navigate('search','Terror')">Ver todos →</a>
+    </div>
+    <div class="cards-grid" id="terrorGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">🚀 Ficção Científica</div>
+      <a class="see-all" onclick="navigate('search','Ficção Científica')">Ver todos →</a>
+    </div>
+    <div class="cards-grid" id="ficciaoGrid"></div>
+  </div>
+
+  <div class="section" style="background:var(--bg2);border-radius:16px;margin-bottom:2rem">
+    <div class="section-header">
+      <div class="section-title">❤️ Romance</div>
+      <a class="see-all" onclick="navigate('search','Romance')">Ver todos →</a>
+    </div>
+    <div class="cards-grid" id="romanceGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">🎥 Documentários</div>
+      <a class="see-all" onclick="navigate('search','Documentário')">Ver todos →</a>
+    </div>
+    <div class="cards-grid" id="documentariosGrid"></div>
+  </div>
+
+  <div class="section" style="background:var(--bg2);border-radius:16px;margin-bottom:2rem">
     <div class="section-header">
       <div class="section-title">🔍 Explorar por Gênero</div>
     </div>
@@ -1022,7 +1086,7 @@ async function fillFormFromTmdb(result, formPrefix) {
       if(prev) prev.style.display='block'; if(img) img.src=poster;
     }
     const bdEl = document.getElementById(P+'Backdrop'); if(bdEl) bdEl.value=backdrop;
-    const emojiMap = {'Ação':'⚔️','Aventura':'🗺️','Animação':'✨','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Terror':'👻','Romance':'❤️','Ficção Científica':'🚀','Suspense':'🔍','Mistério':'🕵️','Filme':'🎬','Série':'📺'};
+    const emojiMap = {'Ação':'⚔️','Aventura':'🗺️','Animação':'🎌','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Terror':'👻','Romance':'❤️','Ficção Científica':'🚀','Suspense':'🎯','Mistério':'🕵️','Guerra':'🪖','Música':'🎵','Filme':'🎬','Série':'📺','Faroeste':'🤠','História':'📜','Ação & Aventura':'⚔️','Infanto-juvenil':'🧒'};
     const mainGenre = genres.find(g => emojiMap[g]) || '';
     set('Emoji', emojiMap[mainGenre] || '🎬');
     if (details.vote_count > 500) setChecked('Popular', true);
@@ -1458,11 +1522,29 @@ async function renderHome() {
     const animGrid = document.getElementById('animacaoGrid');
     const animEmpty = document.getElementById('animacaoEmpty');
     if (animGrid) { if (animacaoList.length > 0) { animGrid.style.display=''; if(animEmpty) animEmpty.style.display='none'; renderGrid('animacaoGrid', animacaoList); } else { animGrid.style.display='none'; if(animEmpty) animEmpty.style.display='block'; } }
+    // Seções de gênero adicionais
+    const genreSections = [
+      { id: 'acaoGrid', genre: 'Ação' },
+      { id: 'comediaGrid', genre: 'Comédia' },
+      { id: 'dramaGrid', genre: 'Drama' },
+      { id: 'terrorGrid', genre: 'Terror' },
+      { id: 'ficciaoGrid', genre: 'Ficção Científica' },
+      { id: 'romanceGrid', genre: 'Romance' },
+      { id: 'documentariosGrid', genre: 'Documentário' },
+    ];
+    genreSections.forEach(({ id, genre }) => {
+      const list = animes.filter(a => (a.genres||[]).includes(genre)).slice(0, 8);
+      const el = document.getElementById(id);
+      if (el) {
+        if (list.length > 0) { el.closest('.section').style.display = ''; renderGrid(id, list); }
+        else { el.closest('.section').style.display = 'none'; }
+      }
+    });
     // Genre tags
     const tagsEl = document.getElementById('genreTagsHome');
     if (tagsEl) {
-      const genreEmojis = {'Ação':'⚔️','Aventura':'🗺️','Animação':'✨','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Ficção Científica':'🚀','Guerra':'🪖','História':'📜','Mistério':'🕵️','Romance':'❤️','Suspense':'🔍','Terror':'👻','Faroeste':'🤠'};
-      const contentGenres = ['Ação','Aventura','Animação','Comédia','Crime','Documentário','Drama','Família','Fantasia','Ficção Científica','Guerra','História','Mistério','Romance','Suspense','Terror','Faroeste'];
+      const genreEmojis = {'Ação':'⚔️','Aventura':'🗺️','Animação':'🎌','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Ficção Científica':'🚀','Guerra':'🪖','História':'📜','Mistério':'🕵️','Romance':'❤️','Suspense':'🎯','Terror':'👻','Faroeste':'🤠','Música':'🎵','Ação & Aventura':'⚔️','Infanto-juvenil':'🧒'};
+      const contentGenres = ['Ação','Aventura','Animação','Comédia','Crime','Documentário','Drama','Família','Fantasia','Ficção Científica','Guerra','História','Mistério','Música','Romance','Suspense','Terror','Faroeste','Ação & Aventura','Infanto-juvenil'];
       tagsEl.innerHTML = contentGenres.map(g => `<button onclick="navigate('search','${g}')" style="padding:.5rem 1.1rem;border-radius:24px;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text2);border:1px solid var(--border);font-family:'Outfit',sans-serif;transition:all .2s;letter-spacing:.02em" onmouseover="this.style.background='rgba(201,168,76,0.08)';this.style.color='var(--gold)';this.style.borderColor='rgba(201,168,76,0.3)'" onmouseout="this.style.background='var(--bg3)';this.style.color='var(--text2)';this.style.borderColor='var(--border)'">${genreEmojis[g]||''} ${g}</button>`).join('');
     }
     renderContinue(animes);
@@ -1596,7 +1678,8 @@ async function removeHistoryItem(historyId, btnEl) {
 // Gêneros organizados por grupo
 const genreGroups = [
   { label: '📂 Navegar', items: ['Todos','Filmes','Séries','Lançamentos','Populares','Recomendados'] },
-  { label: '🎭 Gêneros', items: ['Ação','Aventura','Animação','Comédia','Crime','Documentário','Drama','Família','Fantasia','Ficção Científica','Guerra','História','Mistério','Romance','Suspense','Terror','Faroeste'] },
+  { label: '🎬 Filmes', items: ['Ação','Aventura','Comédia','Drama','Terror','Suspense','Ficção Científica','Fantasia','Romance','Crime','Guerra','Faroeste','História','Documentário'] },
+  { label: '📺 Séries', items: ['Animação','Família','Mistério','Crime','Drama','Comédia','Ficção Científica','Fantasia','Ação & Aventura','Infanto-juvenil'] },
 ];
 const genres = genreGroups.flatMap(g => g.items);
 
@@ -1617,7 +1700,7 @@ async function renderSearch(filter) {
   else if (activeFilter === 'Recomendados') animes = animes.filter(a => a.recommended);
   else if (!['Todos'].includes(activeFilter)) animes = animes.filter(a => (a.genres||[]).includes(activeFilter));
   if (filtersEl) {
-    const genreEmojis = {'Todos':'🌐','Filmes':'🎬','Séries':'📺','Lançamentos':'🆕','Populares':'🔥','Recomendados':'🍿','Ação':'⚔️','Aventura':'🗺️','Animação':'✨','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Ficção Científica':'🚀','Guerra':'🪖','História':'📜','Mistério':'🕵️','Romance':'❤️','Suspense':'🔍','Terror':'👻','Faroeste':'🤠'};
+    const genreEmojis = {'Todos':'🌐','Filmes':'🎬','Séries':'📺','Lançamentos':'🆕','Populares':'🔥','Recomendados':'🍿','Ação':'⚔️','Aventura':'🗺️','Animação':'🎌','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Ficção Científica':'🚀','Guerra':'🪖','História':'📜','Mistério':'🕵️','Romance':'❤️','Suspense':'🎯','Terror':'👻','Faroeste':'🤠','Ação & Aventura':'⚔️','Infanto-juvenil':'🧒','Música':'🎵','Sci-Fi & Fantasia':'🛸'};
     filtersEl.innerHTML = genreGroups.map(group =>
       `<div style="display:contents">` +
       group.items.map(g => `<button class="filter-btn${g===activeFilter?' active':''}" onclick="renderSearch('${g}')">${(genreEmojis[g]||'')} ${g}</button>`).join('') +
