@@ -13,7 +13,7 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <!-- Segurança: Content-Security-Policy restringe de onde scripts/estilos/conexões podem vir, mitigando XSS.
      frame-src é deixado amplo em https: pois o player precisa embutir provedores de vídeo variados cadastrados pelo admin. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org; frame-src https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org; frame-src https: https://superflixapi.rest https://superflixapi.cyou; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
 <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -2044,6 +2044,38 @@ function fmtTime(sec) {
   return m + ':' + String(s).padStart(2,'0');
 }
 
+// ── SUPERFLIX API ──────────────────────────────────────────────
+// Dois domínios disponíveis — use o prefixo para escolher:
+//
+//   superflix:  → https://superflixapi.rest   (domínio 1)
+//   superflix2: → https://superflixapi.cyou   (domínio 2)
+//
+// Formato do campo video_url do episódio:
+//   Filme  → superflix:filme:<TMDB_ou_IMDB>      ex: superflix:filme:155
+//            superflix2:filme:<TMDB_ou_IMDB>     ex: superflix2:filme:tt0468569
+//   Série  → superflix:serie:<TMDB>:<temp>:<ep>  ex: superflix:serie:1396:1:1
+//            superflix2:serie:<TMDB>:<temp>:<ep> ex: superflix2:serie:1396:1:1
+// URLs diretas (.mp4/.m3u8) e iframes normais (https://...) continuam funcionando.
+const SUPERFLIX_DOMAINS = {
+  'superflix':  'https://superflixapi.rest',
+  'superflix2': 'https://superflixapi.cyou',
+};
+function buildSuperflixUrl(raw) {
+  const parts = raw.split(':');
+  // parts[0]='superflix'|'superflix2', [1]='filme'|'serie', [2]=id, [3]=season, [4]=ep
+  const prefix = parts[0].toLowerCase();
+  const base   = SUPERFLIX_DOMAINS[prefix] || SUPERFLIX_DOMAINS['superflix'];
+  const type   = (parts[1] || 'filme').toLowerCase();
+  const id     = parts[2] || '';
+  if (type === 'filme') {
+    return `${base}/filme/${id}`;
+  } else {
+    const season = parts[3] || '1';
+    const ep     = parts[4] || '1';
+    return `${base}/serie/${id}/${season}/${ep}`;
+  }
+}
+
 function loadVideoUrl(videoUrl, resumePct) {
   const container = document.getElementById('playerContent');
   if (!container) return;
@@ -2061,6 +2093,23 @@ function loadVideoUrl(videoUrl, resumePct) {
     return;
   }
 
+  // ── SUPERFLIX (ambos os domínios) ──
+  if (/^superflix2?:/i.test(videoUrl)) {
+    const sfUrl = buildSuperflixUrl(videoUrl);
+    const vpEl = document.getElementById('videoPlayer');
+    vpEl.style.aspectRatio = 'unset';
+    vpEl.style.height = 'auto';
+    vpEl.innerHTML = `
+      <div class="iframe-player-wrap" id="iframePlayerWrap">
+        <iframe id="iframeVideo" src="${sfUrl}"
+          allowfullscreen
+          allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *; clipboard-write *; accelerometer *; gyroscope *; web-share *"
+          referrerpolicy="no-referrer"
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"></iframe>
+      </div>`;
+    return;
+  }
+
   let parsed;
   try { parsed = new URL(videoUrl, window.location.href); } catch(e) { parsed = null; }
   if (!parsed || !['http:','https:'].includes(parsed.protocol)) {
@@ -2074,7 +2123,6 @@ function loadVideoUrl(videoUrl, resumePct) {
   if (isDirectFile) {
     // Custom player with real controls
     const vpEl = document.getElementById('videoPlayer');
-    // Swap container to real-player-wrap
     vpEl.innerHTML = `
       <div class="real-player-wrap" id="realPlayerWrap">
         <video id="animePlayer" style="width:100%;max-height:70vh;background:#000;display:block" preload="metadata"></video>
@@ -2120,7 +2168,7 @@ function loadVideoUrl(videoUrl, resumePct) {
     return;
   }
 
-  // Embed / iframe player com controles visuais
+  // Embed / iframe player — sem botões externos (player já tem seus próprios controles)
   const vpEl = document.getElementById('videoPlayer');
   vpEl.style.aspectRatio = 'unset';
   vpEl.style.height = 'auto';
@@ -2130,21 +2178,8 @@ function loadVideoUrl(videoUrl, resumePct) {
         allowfullscreen
         allow="autoplay; fullscreen; encrypted-media"
         referrerpolicy="no-referrer"
-        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"></iframe>
-    </div>
-    <div class="iframe-controls">
-      <div class="iframe-ctrl-bar" id="iframeBar" onclick="iframeSeek(event)">
-        <div class="iframe-ctrl-fill" id="iframeFill"></div>
-      </div>
-      <div class="iframe-ctrl-row">
-        <button class="icbtn" onclick="iframeSkip(-10)" title="Voltar 10s">⏪ -10s</button>
-        <button class="icbtn icbtn-main" id="iframePlayBtn" onclick="iframeTogglePlay()">⏸ Pausar</button>
-        <button class="icbtn" onclick="iframeSkip(10)" title="Avançar 10s">+10s ⏩</button>
-        <span class="iframe-time" id="iframeTime">00:00 / --:--</span>
-        <button class="icbtn iframe-fullscreen" onclick="iframeFullscreen()" title="Tela cheia">⛶ Tela cheia</button>
-      </div>
+        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"></iframe>
     </div>`;
-  _startIframeTimer();
 }
 
 function _wireRealPlayer(video, resumePct) {
