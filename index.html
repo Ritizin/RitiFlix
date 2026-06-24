@@ -3491,6 +3491,104 @@ async function preloadBannerAnimeName(animeId) {
   } catch(e) {}
 }
 
+// ============================================================
+// TMDB — busca no formulário de Banner (Hero)
+// ============================================================
+// Fluxo: busca o filme/série no TMDb -> ao selecionar, preenche capa (backdrop),
+// badge, as 3 linhas do título (Nome / "Assista Nome" / "Sem Pagar Nada") e a
+// descrição (sinopse do TMDb). Também tenta vincular automaticamente a um
+// título já existente no catálogo, se houver um com nome correspondente.
+function bannerTmdbSearchBlockHTML() {
+  return `<div style="background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.2);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem">
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+      <span style="font-size:1.1rem">🎬</span>
+      <span style="font-size:.8rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.1em">Buscar no TMDb</span>
+      <span style="font-size:.7rem;color:var(--text3);margin-left:.3rem">— preenche capa, título e descrição</span>
+    </div>
+    <div style="position:relative">
+      <input id="bannerTmdbInput" class="form-input" placeholder="🔍  Nome do filme ou série..." style="border-color:rgba(201,168,76,0.3)" autocomplete="off">
+      <div id="bannerTmdbDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg3);border:1px solid rgba(201,168,76,0.25);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,0.55);z-index:400;max-height:340px;overflow-y:auto"></div>
+    </div>
+    <div style="font-size:.71rem;color:var(--text3);margin-top:.5rem">Selecione um resultado para preencher a capa, o título (em 3 linhas) e a descrição automaticamente.</div>
+  </div>`;
+}
+
+function renderBannerTmdbDropdown(results) {
+  const dd = document.getElementById('bannerTmdbDropdown');
+  if (!dd) return;
+  const filtered = (results||[]).filter(r => r.media_type !== 'person');
+  if (filtered.length === 0) {
+    dd.innerHTML = '<div style="padding:.75rem 1rem;color:var(--text3);font-size:.85rem">Nenhum resultado encontrado.</div>';
+    dd.style.display = 'block'; return;
+  }
+  dd.innerHTML = filtered.slice(0,8).map((r,i) => {
+    const title = r.title || r.name || '?';
+    const mtype = r.media_type === 'movie' ? '🎬 Filme' : '📺 Série';
+    const year = (r.release_date || r.first_air_date || '').substring(0,4);
+    const thumb = r.poster_path ? `<img src="${TMDB_IMG}${r.poster_path}" style="width:32px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0">` : `<div style="width:32px;height:48px;background:var(--bg4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">🎬</div>`;
+    return `<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;cursor:pointer;border-bottom:1px solid rgba(30,45,71,0.5);transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''" onclick="window._bannerTmdbSelectFn(${i})">${thumb}<div style="min-width:0"><div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(title)}</div><div style="font-size:.72rem;color:var(--text3)">${mtype}${year?' • '+year:''}</div></div></div>`;
+  }).join('');
+  dd.style.display = 'block';
+  window._bannerTmdbSelectFn = (idx) => { dd.style.display='none'; fillBannerFormFromTmdb(filtered[idx]); };
+}
+
+async function fillBannerFormFromTmdb(result) {
+  const isMovie = result.media_type === 'movie' || (!result.media_type && result.title);
+  const type = isMovie ? 'movie' : 'tv';
+  showNotif('⏳ Carregando dados do TMDb...', 'success');
+  try {
+    const details = await tmdbGetDetails(result.id, type);
+    const title = details.title || details.name || '';
+    const desc = details.overview || '';
+    const backdrop = tmdbPosterUrl(details.backdrop_path, true);
+
+    const set = (id,val) => { const el=document.getElementById(id); if(el) el.value=val; };
+    set('bannerTitle1', title);
+    set('bannerTitle2', 'Assista ' + title);
+    set('bannerTitle3', 'Sem Pagar Nada');
+    if (desc) set('bannerDesc', desc);
+    if (backdrop) {
+      set('bannerCoverUrl', backdrop);
+      const coverInput = document.getElementById('bannerCoverUrl');
+      const card = coverInput ? coverInput.closest('.admin-section-card') : null;
+      let preview = document.getElementById('bannerCoverPreview');
+      if (card) {
+        if (!preview) {
+          preview = document.createElement('div');
+          preview.id = 'bannerCoverPreview';
+          preview.style.cssText = 'border-radius:10px;overflow:hidden;max-height:180px;border:1px solid var(--border);margin-top:.75rem';
+          card.appendChild(preview);
+        }
+        preview.innerHTML = `<img src="${backdrop}" style="width:100%;object-fit:cover;max-height:180px" onerror="this.style.display='none'">`;
+      }
+    }
+    const inputEl = document.getElementById('bannerTmdbInput'); if (inputEl) inputEl.value = title;
+    // Tenta vincular automaticamente a um título já existente no catálogo
+    try {
+      const { data } = await sb.from('animes').select('id,title,emoji').ilike('title', title).limit(1);
+      if (data && data.length > 0) selectBannerAnime(data[0].id, (data[0].emoji||'🎬') + ' ' + data[0].title);
+    } catch(e) {}
+    showNotif('✅ TMDb: banner preenchido automaticamente!', 'success');
+  } catch(e) { showNotif('❌ Erro ao buscar detalhes: '+e.message,'error'); }
+}
+
+function initBannerTmdbSearch() {
+  const inputEl = document.getElementById('bannerTmdbInput');
+  if (!inputEl) return;
+  let _timer;
+  inputEl.oninput = function() {
+    clearTimeout(_timer);
+    const q = this.value.trim();
+    if (q.length < 2) { const dd=document.getElementById('bannerTmdbDropdown'); if(dd) dd.style.display='none'; return; }
+    _timer = setTimeout(async () => {
+      try {
+        const results = await tmdbSearch(q, 'multi');
+        renderBannerTmdbDropdown(results);
+      } catch(e) { showNotif('❌ Erro TMDb: '+e.message, 'error'); }
+    }, 400);
+  };
+}
+
 async function adminSaveHeroInterval() {
   const raw = parseInt(document.getElementById('heroIntervalInput').value, 10);
   const interval = isNaN(raw) ? 7 : Math.max(3, Math.min(60, raw));
@@ -3512,6 +3610,7 @@ function adminEditHeroBannerItem(id) {
     <button class="btn btn-ghost" onclick="adminNav('heroBanner',null)">← Banners</button>
   </div>
   <div class="admin-form">
+    ${bannerTmdbSearchBlockHTML()}
     <div class="admin-section-card">
       <div class="admin-section-title">Imagem de capa</div>
       <div class="form-group">
@@ -3519,7 +3618,7 @@ function adminEditHeroBannerItem(id) {
         <input class="form-input" id="bannerCoverUrl" placeholder="https://exemplo.com/capa.jpg" value="${item?.coverUrl||''}">
         <div style="font-size:.75rem;color:var(--text3);margin-top:.4rem">Recomendado: 1920×1080px. Deixe em branco para usar o fundo padrão.</div>
       </div>
-      ${item?.coverUrl ? `<div style="border-radius:10px;overflow:hidden;max-height:180px;border:1px solid var(--border)"><img src="${item.coverUrl}" style="width:100%;object-fit:cover;max-height:180px" onerror="this.style.display='none'"></div>` : ''}
+      ${item?.coverUrl ? `<div id="bannerCoverPreview" style="border-radius:10px;overflow:hidden;max-height:180px;border:1px solid var(--border);margin-top:.75rem"><img src="${item.coverUrl}" style="width:100%;object-fit:cover;max-height:180px" onerror="this.style.display='none'"></div>` : ''}
     </div>
     <div class="admin-section-card">
       <div class="admin-section-title">Texto do banner</div>
@@ -3546,6 +3645,7 @@ function adminEditHeroBannerItem(id) {
     </div>
   </div>`;
   if (item?.animeId) setTimeout(() => preloadBannerAnimeName(item.animeId), 100);
+  initBannerTmdbSearch();
 }
 
 async function adminSaveHeroBannerItem(id) {
