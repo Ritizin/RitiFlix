@@ -2089,10 +2089,31 @@ function EmbedPlayer(t, i, s, e, baseUrl) {
   u = u.replace(/([^:])(\/{2,})/g, "$1/");
   f.style.aspectRatio = 'unset';
   f.style.height = 'auto';
-  f.innerHTML = '<div class="iframe-player-wrap" id="iframePlayerWrap">'
-    + '<iframe id="iframeVideo" src="' + u + '" width="100%" height="100%" frameborder="0"'
-    + ' allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *; web-share *"'
-    + ' allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe></div>';
+  f.innerHTML = '<div class="iframe-player-wrap" id="iframePlayerWrap"></div>';
+
+  // ── BLOQUEIO DE ANÚNCIOS / POPUPS ──────────────────────────────
+  // Criamos o iframe via DOM (não via innerHTML) para poder aplicar
+  // o atributo sandbox de forma confiável em todos os navegadores.
+  // allow-popups NÃO está incluído de propósito: isso impede que o
+  // player (ou anúncios injetados por ele) abram novas abas/janelas
+  // falsas (ex.: alertas falsos de "vírus", Cloudflare fake, etc.).
+  var wrap = f.querySelector('.iframe-player-wrap');
+  var iframe = document.createElement('iframe');
+  iframe.id = 'iframeVideo';
+  iframe.src = u;
+  iframe.width = '100%';
+  iframe.height = '100%';
+  iframe.frameBorder = '0';
+  iframe.setAttribute('allow', 'autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *; web-share *');
+  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
+  iframe.allowFullscreen = true;
+  iframe.setAttribute('webkitallowfullscreen', '');
+  iframe.setAttribute('mozallowfullscreen', '');
+  wrap.appendChild(iframe);
+
+  // Proteção adicional: trava qualquer tentativa de window.open
+  // disparada pelo player/anúncios para abrir popups maliciosos.
+  window.open = function() { return null; };
 }
 
 /*
