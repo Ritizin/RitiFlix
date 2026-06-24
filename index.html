@@ -1193,7 +1193,10 @@ async function fillFormFromTmdb(result, formPrefix) {
       const prev=document.getElementById(P+'PosterPrev'), img=document.getElementById(P+'PosterImg');
       if(prev) prev.style.display='block'; if(img) img.src=poster;
     }
-    const bdEl = document.getElementById(P+'Backdrop'); if(bdEl) bdEl.value=backdrop;
+    const bdEl = document.getElementById(P+'Banner') || document.getElementById(P+'Backdrop'); if(bdEl) bdEl.value=backdrop;
+    // Atualiza preview do banner se existir
+    const bdPrev = document.getElementById(P+'BannerPrev'), bdImg = document.getElementById(P+'BannerImg');
+    if(bdPrev && bdImg && backdrop){ bdPrev.style.display='block'; bdImg.src=backdrop; }
     const emojiMap = {'Ação':'⚔️','Aventura':'🗺️','Animação':'🎌','Comédia':'😂','Crime':'🔫','Documentário':'🎥','Drama':'🎭','Família':'👨‍👩‍👧','Fantasia':'🧙','Terror':'👻','Romance':'❤️','Ficção Científica':'🚀','Suspense':'🎯','Mistério':'🕵️','Guerra':'🪖','Música':'🎵','Filme':'🎬','Série':'📺','Faroeste':'🤠','História':'📜','Ação & Aventura':'⚔️','Infanto-juvenil':'🧒'};
     const mainGenre = genres.find(g => emojiMap[g]) || '';
     set('Emoji', emojiMap[mainGenre] || '🎬');
@@ -1262,8 +1265,9 @@ async function tmdbTrending(type='all') {
 // ============================================================
 // Fluxo: 1) busca a série pelo nome -> 2) busca a temporada já indicada
 // no formulário -> 3) lista os episódios daquela temporada -> ao
-// escolher, preenche título, miniatura, duração e número do episódio.
-// A URL do vídeo nunca é preenchida automaticamente.
+// escolher, preenche título, miniatura, duração, número do episódio
+// e a URL do vídeo no padrão https://myembed.biz/serie/{tmdb_id}/{temporada}/{episodio}
+// (só quando o campo de URL estiver vazio, para não sobrescrever link já cadastrado).
 
 async function tmdbFetchSeasonEpisodes(tvId, seasonNumber) {
   const data = await tmdbFetch('/tv/'+tvId+'/season/'+seasonNumber);
@@ -1281,7 +1285,7 @@ function epTmdbSearchBlockHTML(prefix) {
       <input id="${prefix}EpTmdbInput" class="form-input" placeholder="🔍  Nome da série..." style="border-color:rgba(201,168,76,0.3)" autocomplete="off">
       <div id="${prefix}EpTmdbDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg3);border:1px solid rgba(201,168,76,0.25);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,0.55);z-index:400;max-height:340px;overflow-y:auto"></div>
     </div>
-    <div style="font-size:.71rem;color:var(--text3);margin-top:.5rem">Busque a série, escolha-a e depois selecione o episódio da temporada informada acima. A URL do vídeo não é preenchida — você adiciona manualmente.</div>
+    <div style="font-size:.71rem;color:var(--text3);margin-top:.5rem">Busque a série, escolha-a e depois selecione o episódio da temporada informada acima. A URL do vídeo é preenchida automaticamente no padrão myembed.biz (só se o campo estiver vazio) — confira/ajuste se precisar.</div>
   </div>`;
 }
 
@@ -1339,6 +1343,7 @@ function fillEpFormFromTmdb(prefix, ep) {
   const thumbId = prefix === 'ep' ? 'epThumb' : 'eeThumb';
   const thumbPrevId = prefix === 'ep' ? 'epThumbPrev' : 'eeThumbPrev';
   const thumbImgId = prefix === 'ep' ? 'epThumbImg' : 'eeThumbImg';
+  const urlId = prefix === 'ep' ? 'epUrl' : 'eeUrl';
 
   const titleEl = document.getElementById(titleId); if (titleEl) titleEl.value = ep.name || '';
   const numEl = document.getElementById(numId); if (numEl) { numEl.value = ep.episode_number || 1; numEl.dataset.touched = '1'; }
@@ -1353,6 +1358,15 @@ function fillEpFormFromTmdb(prefix, ep) {
     const prev = document.getElementById(thumbPrevId), img = document.getElementById(thumbImgId);
     if (prev) prev.style.display = 'block';
     if (img) img.src = thumb;
+  }
+  // Gera a URL básica do player no padrão myembed.biz/serie/{tmdb_id}/{temporada}/{episodio}
+  // Só preenche se o campo estiver vazio, para não sobrescrever um link já cadastrado manualmente.
+  const series = window['_epTmdbSeries_'+prefix];
+  const seasonNum = ep.season_number != null ? ep.season_number : (parseInt(document.getElementById(prefix === 'ep' ? 'epSeason' : 'eeSeasonN')?.value) || 1);
+  const epNum = ep.episode_number || 1;
+  const urlEl = document.getElementById(urlId);
+  if (urlEl && series && series.id && !urlEl.value.trim()) {
+    urlEl.value = `https://myembed.biz/serie/${series.id}/${seasonNum}/${epNum}`;
   }
   const dd = document.getElementById(prefix+'EpTmdbDropdown'); if (dd) dd.style.display = 'none';
   const inputEl = document.getElementById(prefix+'EpTmdbInput'); if (inputEl) inputEl.value = (ep.name||'');
@@ -1748,23 +1762,23 @@ async function renderContinue(animes) {
       .select('*, animes(title, emoji, poster, genres, type), episodes(num, title)')
       .eq('user_id', currentUser.id)
       .order('watched_at', { ascending: false })
-      .limit(20);
+      .limit(30);
     if (error) throw error;
     const seen = new Set();
     const items = (history || []).filter(h => {
-      if (!h.animes || !h.anime_id) return false;
+      if (!h.animes || !h.anime_id || !h.episode_id) return false;
       if (seen.has(h.anime_id)) return false;
       seen.add(h.anime_id);
       return true;
-    }).slice(0, 6);
+    }).slice(0, 8);
     if (items.length === 0) { section.style.display = 'none'; grid.innerHTML = ''; return; }
-    section.style.display = 'block';
+    section.style.display = '';
     grid.innerHTML = items.map(h => {
       const a = h.animes;
       const movie = isAnimeMovie(a);
       const pct = Math.max(2, Math.min(100, h.progress || 2));
       const epLabel = movie ? 'Filme' : ('Ep. ' + (h.ep_num ?? (h.episodes?.num ?? '?')));
-      const timeLeft = pct < 95 ? Math.round((1 - pct/100) * (movie ? 105 : 45)) + ' min restantes' : 'Concluído ✓';
+      const timeLeft = pct >= 95 ? 'Concluído ✓' : Math.round((1 - pct/100) * (movie ? 105 : 45)) + ' min restantes';
       return `<div class="continue-card" onclick="navigate('player',{animeId:${h.anime_id},epId:${h.episode_id}})">
         <div class="continue-card-thumb">
           ${a.poster ? `<img src="${a.poster}" alt="">` : `<span style="font-size:3rem">${a.emoji||'🎬'}</span>`}
@@ -3004,10 +3018,13 @@ function renderAdminAddAnime(el) {
         <div class="form-group"><label class="form-label">Título *</label><input class="form-input" id="aTitle" placeholder="Nome do filme/série"></div>
         <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="aEmoji" placeholder="🎬" value="🎬"></div>
       </div>
-      <div class="form-group"><label class="form-label">URL da Capa</label><input class="form-input" id="aPoster" placeholder="https://imagem.jpg"></div>
+      <div class="form-group"><label class="form-label">URL da Capa</label><input class="form-input" id="aPoster" placeholder="https://imagem.jpg" oninput="document.getElementById('aPosterPrev').style.display=this.value?'block':'none';document.getElementById('aPosterImg').src=this.value">
+        <div id="aPosterPrev" style="margin-top:.5rem;display:none"><img id="aPosterImg" src="" style="width:80px;height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
+      </div>
       <div class="form-group">
         <label class="form-label">URL do Banner da Página <span style="color:var(--text3);font-weight:400;font-size:.7rem">(imagem de fundo na tela do título)</span></label>
-        <input class="form-input" id="aBanner" placeholder="https://imagem-banner.jpg (recomendado: 1280×720px ou maior)">
+        <input class="form-input" id="aBanner" placeholder="https://imagem-banner.jpg (recomendado: 1280×720px ou maior)" oninput="document.getElementById('aBannerPrev').style.display=this.value?'block':'none';document.getElementById('aBannerImg').src=this.value">
+        <div id="aBannerPrev" style="margin-top:.5rem;display:none"><img id="aBannerImg" src="" style="width:100%;max-width:360px;height:100px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
       </div>
       <div class="form-group"><label class="form-label">Descrição *</label><textarea class="form-textarea" id="aDesc" placeholder="Sinopse..."></textarea></div>
       <div class="form-row">
