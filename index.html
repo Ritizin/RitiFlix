@@ -1233,19 +1233,46 @@ async function tmdbSearchAndFillVideoUrl(query, targetInputId, type) {
       const thumb = r.poster_path ? `<img src="${TMDB_IMG}${r.poster_path}" style="width:32px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0">` : `<div style="width:32px;height:48px;background:var(--bg4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">🎬</div>`;
       return `<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;cursor:pointer;border-bottom:1px solid rgba(30,45,71,0.5);transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''" onclick="window._tmdbVideoSelectFn_${targetInputId}(${i})">${thumb}<div style="min-width:0"><div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(title)}</div><div style="font-size:.72rem;color:var(--text3)">${mtype}${year?' • '+year:''} • ID: ${r.id}</div></div></div>`;
     }).join('');
-    window['_tmdbVideoSelectFn_'+targetInputId] = (idx) => {
+    window['_tmdbVideoSelectFn_'+targetInputId] = async (idx) => {
       const r = results[idx];
       const isMovie = r.media_type === 'movie' || type === 'movie';
       const tmdbId = r.id;
       const url = isMovie ? `https://myembed.biz/filme/${tmdbId}` : `https://myembed.biz/serie/${tmdbId}`;
       const inputEl = document.getElementById(targetInputId);
       if (inputEl) { inputEl.value = url; inputEl.dispatchEvent(new Event('input')); }
-      const infoEl = document.getElementById(ddId + '_info');
-      if (infoEl) infoEl.innerHTML = `<span style="color:#4ade80">✓ TMDb ID: <strong>${tmdbId}</strong> — URL: <code style="font-size:.75rem;color:var(--gold)">${url}</code></span>`;
       dd.style.display = 'none';
       const searchInput = document.getElementById(ddId + '_input');
       if (searchInput) searchInput.value = r.title || r.name || '';
-      showNotif('✅ URL do player preenchida! ID TMDb: ' + tmdbId, 'success');
+
+      // Busca detalhes completos para preencher miniatura e duração
+      const infoEl = document.getElementById(ddId + '_info');
+      if (infoEl) infoEl.innerHTML = `<span style="color:var(--text3)">⏳ Buscando detalhes no TMDb...</span>`;
+      try {
+        const details = await tmdbGetDetails(tmdbId, isMovie ? 'movie' : 'tv');
+        // Preenche miniatura com backdrop (se disponível) ou poster
+        const backdropUrl = details.backdrop_path ? (TMDB_IMG_HD + details.backdrop_path) : (details.poster_path ? (TMDB_IMG + details.poster_path) : '');
+        const thumbInput = document.getElementById('mvThumb') || document.getElementById(targetInputId.replace('Url','Thumb'));
+        if (thumbInput && backdropUrl && !thumbInput.value) { thumbInput.value = backdropUrl; }
+
+        // Preenche duração (minutos → HH:MM:SS) para filmes
+        if (isMovie && details.runtime) {
+          const durInput = document.getElementById('mvDur') || document.getElementById(targetInputId.replace('Url','Dur'));
+          if (durInput) {
+            const h = Math.floor(details.runtime / 60);
+            const m = details.runtime % 60;
+            durInput.value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`;
+          }
+        }
+
+        const posterPreview = details.poster_path ? `<img src="${TMDB_IMG}${details.poster_path}" style="width:28px;height:42px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:.4rem">` : '';
+        const durText = (isMovie && details.runtime) ? ` • ⏱️ ${details.runtime} min` : '';
+        const yearText = (details.release_date || details.first_air_date || '').substring(0,4);
+        if (infoEl) infoEl.innerHTML = `<span style="color:#4ade80;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">${posterPreview}<span>✓ <strong>${sanitize(details.title||details.name||'')}</strong>${yearText?' ('+yearText+')':''} — ID: <strong>${tmdbId}</strong>${durText}${backdropUrl && thumbInput && !document.getElementById('mvThumb')?.value ? '' : backdropUrl ? ' • 🖼️ Miniatura preenchida' : ''}</span></span>`;
+        showNotif('✅ URL + detalhes TMDb preenchidos! ID: ' + tmdbId, 'success');
+      } catch(e) {
+        if (infoEl) infoEl.innerHTML = `<span style="color:#4ade80">✓ TMDb ID: <strong>${tmdbId}</strong> — URL: <code style="font-size:.75rem;color:var(--gold)">${url}</code></span>`;
+        showNotif('✅ URL do player preenchida! ID TMDb: ' + tmdbId, 'success');
+      }
     };
   } catch(e) {
     dd.innerHTML = '<div style="padding:.75rem 1rem;color:#f87171;font-size:.85rem">❌ Erro: '+sanitize(e.message)+'</div>';
@@ -1258,7 +1285,7 @@ function tmdbVideoUrlSearchBlockHTML(targetInputId, type) {
   const searchType = (type === 'tv') ? 'tv' : 'movie';
   return `<div class="admin-section-card" style="border-color:rgba(201,168,76,0.25);background:rgba(201,168,76,0.03)">
     <div class="admin-section-title" style="color:var(--gold)">🔍 Buscar no TMDb → Preencher URL do Player</div>
-    <div style="font-size:.8rem;color:var(--text3);margin-bottom:.85rem">Busque o ${typeLabel.replace(/[🎬📺] /,'')} pelo nome para preencher automaticamente a URL do player com o ID correto do TMDb.</div>
+    <div style="font-size:.8rem;color:var(--text3);margin-bottom:.85rem">Busque o ${typeLabel.replace(/[🎬📺] /,'')} pelo nome para preencher automaticamente a <strong style="color:var(--text2)">URL do player</strong>, a <strong style="color:var(--text2)">miniatura</strong> e a <strong style="color:var(--text2)">duração</strong> com os dados do TMDb.</div>
     <div style="position:relative">
       <input id="${ddId}_input" class="form-input" placeholder="🔍 Nome do ${typeLabel.replace(/[🎬📺] /,'').toLowerCase()}..." style="border-color:rgba(201,168,76,0.3)" autocomplete="off"
         oninput="(function(q){clearTimeout(window['_tvTimer_${ddId}']);if(q.length<2){var dd=document.getElementById('${ddId}');if(dd)dd.style.display='none';return;}window['_tvTimer_${ddId}']=setTimeout(()=>tmdbSearchAndFillVideoUrl(q,'${targetInputId}','${searchType}'),400);})(this.value.trim())"
@@ -4006,8 +4033,8 @@ async function renderAdminGenres(el) {
 // ============================================================
 function getMixdropCredentials() {
   return {
-    email: localStorage.getItem('mixdrop_email') || '',
-    key:   localStorage.getItem('mixdrop_key')   || ''
+    email: localStorage.getItem('mixdrop_email') || 'Ritizin00@gmail.com',
+    key:   localStorage.getItem('mixdrop_key')   || 'ubz7wpzqZ0Vujjrlyr2'
   };
 }
 
