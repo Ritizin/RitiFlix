@@ -13,7 +13,7 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <!-- Segurança: Content-Security-Policy restringe de onde scripts/estilos/conexões podem vir, mitigando XSS.
      frame-src é deixado amplo em https: pois o player precisa embutir provedores de vídeo variados cadastrados pelo admin. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org https://superflixapi.rest https://superflixapi.cyou https://*.cloudflare.com https://challenges.cloudflare.com; frame-src https: https://superflixapi.rest https://superflixapi.cyou; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org https://superflixapi.rest https://superflixapi.cyou https://*.cloudflare.com https://challenges.cloudflare.com https://ul.mixdrop.ag https://api.mixdrop.ag; frame-src https: https://superflixapi.rest https://superflixapi.cyou; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
 <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -1202,9 +1202,71 @@ async function fillFormFromTmdb(result, formPrefix) {
     set('Emoji', emojiMap[mainGenre] || '🎬');
     if (details.vote_count > 500) setChecked('Popular', true);
     if (parseInt(year) >= 2024) setChecked('New', true);
+    // Armazena o TMDB ID para uso posterior (ex: no formulário de vídeo do filme)
+    window._lastTmdbId = details.id;
+    window._lastTmdbType = isMovie ? 'filme' : 'serie';
     showNotif('✅ TMDb: dados preenchidos automaticamente!', 'success');
   } catch(e) { showNotif('❌ Erro ao buscar detalhes: '+e.message,'error'); }
   document.getElementById('tmdbDropdown').style.display='none';
+}
+
+// ============================================================
+// TMDB — Busca por ID para preencher URL do player (myembed.biz)
+// ============================================================
+async function tmdbSearchAndFillVideoUrl(query, targetInputId, type) {
+  if (!query || query.length < 2) return;
+  const ddId = 'tmdbVideoUrlDropdown_' + targetInputId;
+  let dd = document.getElementById(ddId);
+  if (!dd) return;
+  dd.innerHTML = '<div style="padding:.75rem 1rem;color:var(--text3);font-size:.85rem">⏳ Buscando no TMDb...</div>';
+  dd.style.display = 'block';
+  try {
+    const results = await tmdbSearch(query, type || 'movie');
+    if (!results || results.length === 0) {
+      dd.innerHTML = '<div style="padding:.75rem 1rem;color:var(--text3);font-size:.85rem">Nenhum resultado encontrado.</div>';
+      return;
+    }
+    dd.innerHTML = results.slice(0,8).map((r,i) => {
+      const title = r.title || r.name || '?';
+      const year = (r.release_date || r.first_air_date || '').substring(0,4);
+      const mtype = r.media_type === 'tv' || type === 'tv' ? '📺 Série' : '🎬 Filme';
+      const thumb = r.poster_path ? `<img src="${TMDB_IMG}${r.poster_path}" style="width:32px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0">` : `<div style="width:32px;height:48px;background:var(--bg4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">🎬</div>`;
+      return `<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;cursor:pointer;border-bottom:1px solid rgba(30,45,71,0.5);transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''" onclick="window._tmdbVideoSelectFn_${targetInputId}(${i})">${thumb}<div style="min-width:0"><div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(title)}</div><div style="font-size:.72rem;color:var(--text3)">${mtype}${year?' • '+year:''} • ID: ${r.id}</div></div></div>`;
+    }).join('');
+    window['_tmdbVideoSelectFn_'+targetInputId] = (idx) => {
+      const r = results[idx];
+      const isMovie = r.media_type === 'movie' || type === 'movie';
+      const tmdbId = r.id;
+      const url = isMovie ? `https://myembed.biz/filme/${tmdbId}` : `https://myembed.biz/serie/${tmdbId}`;
+      const inputEl = document.getElementById(targetInputId);
+      if (inputEl) { inputEl.value = url; inputEl.dispatchEvent(new Event('input')); }
+      const infoEl = document.getElementById(ddId + '_info');
+      if (infoEl) infoEl.innerHTML = `<span style="color:#4ade80">✓ TMDb ID: <strong>${tmdbId}</strong> — URL: <code style="font-size:.75rem;color:var(--gold)">${url}</code></span>`;
+      dd.style.display = 'none';
+      const searchInput = document.getElementById(ddId + '_input');
+      if (searchInput) searchInput.value = r.title || r.name || '';
+      showNotif('✅ URL do player preenchida! ID TMDb: ' + tmdbId, 'success');
+    };
+  } catch(e) {
+    dd.innerHTML = '<div style="padding:.75rem 1rem;color:#f87171;font-size:.85rem">❌ Erro: '+sanitize(e.message)+'</div>';
+  }
+}
+
+function tmdbVideoUrlSearchBlockHTML(targetInputId, type) {
+  const ddId = 'tmdbVideoUrlDropdown_' + targetInputId;
+  const typeLabel = (type === 'tv') ? '📺 Série' : '🎬 Filme';
+  const searchType = (type === 'tv') ? 'tv' : 'movie';
+  return `<div class="admin-section-card" style="border-color:rgba(201,168,76,0.25);background:rgba(201,168,76,0.03)">
+    <div class="admin-section-title" style="color:var(--gold)">🔍 Buscar no TMDb → Preencher URL do Player</div>
+    <div style="font-size:.8rem;color:var(--text3);margin-bottom:.85rem">Busque o ${typeLabel.replace(/[🎬📺] /,'')} pelo nome para preencher automaticamente a URL do player com o ID correto do TMDb.</div>
+    <div style="position:relative">
+      <input id="${ddId}_input" class="form-input" placeholder="🔍 Nome do ${typeLabel.replace(/[🎬📺] /,'').toLowerCase()}..." style="border-color:rgba(201,168,76,0.3)" autocomplete="off"
+        oninput="(function(q){clearTimeout(window['_tvTimer_${ddId}']);if(q.length<2){var dd=document.getElementById('${ddId}');if(dd)dd.style.display='none';return;}window['_tvTimer_${ddId}']=setTimeout(()=>tmdbSearchAndFillVideoUrl(q,'${targetInputId}','${searchType}'),400);})(this.value.trim())"
+        onblur="setTimeout(()=>{var dd=document.getElementById('${ddId}');if(dd)dd.style.display='none';},200)">
+      <div id="${ddId}" style="position:absolute;left:0;right:0;top:100%;z-index:200;background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:260px;overflow-y:auto;display:none;margin-top:.25rem;box-shadow:var(--shadow)"></div>
+    </div>
+    <div id="${ddId}_info" style="margin-top:.55rem;font-size:.8rem;min-height:1.2em"></div>
+  </div>`;
 }
 
 function initTmdbSearch(formPrefix) {
@@ -3103,11 +3165,13 @@ async function renderAdminMovieVideo(el, animeId) {
     </div>
   </div>
   <div class="admin-form">
+    ${tmdbVideoUrlSearchBlockHTML('mvUrl','movie')}
+    ${mixdropUploadBlockHTML('mvUrl')}
     <div class="admin-section-card">
       <div class="admin-section-title">🎬 Vídeo do filme</div>
-      <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.25rem">${ep && ep.video_url ? '<span style="color:#4ade80">✓ Este filme já tem um vídeo cadastrado.</span>' : 'Nenhum vídeo cadastrado ainda. Cole a URL abaixo para publicar.'}</div>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.25rem">${ep && ep.video_url ? '<span style="color:#4ade80">✓ Este filme já tem um vídeo cadastrado.</span>' : 'Nenhum vídeo cadastrado ainda. Cole a URL abaixo ou busque pelo TMDb acima para preencher automaticamente.'}</div>
       ${extraCount > 0 ? `<div style="font-size:.78rem;color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:.6rem .9rem;margin-bottom:1rem">⚠️ Encontramos ${extraCount} registro(s) de vídeo duplicado(s) para este filme — isso pode fazer o player carregar o vídeo errado. Ao salvar, os duplicados serão removidos automaticamente.</div>` : ''}
-      <div class="form-group"><label class="form-label">URL do vídeo *</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame, ex: https://fembed.sx/e/533535)"></div>
+      <div class="form-group"><label class="form-label">URL do vídeo *</label><input class="form-input" id="mvUrl" value="${ep?.video_url||''}" placeholder="https://myembed.biz/filme/346671 ou .mp4/.m3u8"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Duração</label><input class="form-input" id="mvDur" value="${ep?.duration||'01:45:00'}" placeholder="01:45:00"></div>
         <div class="form-group"><label class="form-label">URL da Miniatura (opcional)</label><input class="form-input" id="mvThumb" value="${ep?.thumbnail_url||''}" placeholder="https://imagem-thumb.jpg"></div>
@@ -3331,6 +3395,7 @@ async function renderAdminEditEp(el, epId) {
   </div>
   <div class="admin-form">
     ${epTmdbSearchBlockHTML('ee')}
+    ${mixdropUploadBlockHTML('eeUrl')}
     <div class="admin-section-card">
       <div class="admin-section-title">Dados do episódio</div>
       <div class="form-row">
@@ -3936,7 +4001,138 @@ async function renderAdminGenres(el) {
   </div>`;
 }
 
+// ============================================================
+// MIXDROP API
+// ============================================================
+function getMixdropCredentials() {
+  return {
+    email: localStorage.getItem('mixdrop_email') || '',
+    key:   localStorage.getItem('mixdrop_key')   || ''
+  };
+}
+
+async function mixdropRemoteUpload(url, name) {
+  const { email, key } = getMixdropCredentials();
+  if (!email || !key) { showNotif('❌ Configure o e-mail e API Key do MixDrop nas Configurações.', 'error'); return null; }
+  try {
+    const params = new URLSearchParams({ email, key, url });
+    if (name) params.append('name', name);
+    const res = await fetch(`https://api.mixdrop.ag/remoteupload?${params}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.msg || 'Erro desconhecido');
+    return data.result; // { id, fileref, url, embedurl }
+  } catch(e) { showNotif('❌ MixDrop: ' + e.message, 'error'); return null; }
+}
+
+async function mixdropRemoteStatus(id) {
+  const { email, key } = getMixdropCredentials();
+  if (!email || !key) return null;
+  try {
+    const res = await fetch(`https://api.mixdrop.ag/remotestatus?${new URLSearchParams({ email, key, id })}`);
+    const data = await res.json();
+    return data.success ? data.result : null;
+  } catch(e) { return null; }
+}
+
+async function mixdropFileInfo(refs) {
+  const { email, key } = getMixdropCredentials();
+  if (!email || !key) { showNotif('❌ Configure o e-mail e API Key do MixDrop nas Configurações.', 'error'); return null; }
+  try {
+    const refsParam = (Array.isArray(refs) ? refs : [refs]).map(r => `ref[]=${encodeURIComponent(r)}`).join('&');
+    const res = await fetch(`https://api.mixdrop.ag/fileinfo2?email=${encodeURIComponent(email)}&key=${encodeURIComponent(key)}&${refsParam}`);
+    const data = await res.json();
+    return data.success ? data.result : null;
+  } catch(e) { showNotif('❌ MixDrop: ' + e.message, 'error'); return null; }
+}
+
+async function mixdropUploadFile(file, folder) {
+  const { email, key } = getMixdropCredentials();
+  if (!email || !key) { showNotif('❌ Configure o e-mail e API Key do MixDrop nas Configurações.', 'error'); return null; }
+  try {
+    const form = new FormData();
+    form.append('email', email);
+    form.append('key', key);
+    form.append('file', file);
+    if (folder) form.append('folder', folder);
+    const res = await fetch('https://ul.mixdrop.ag/api', { method: 'POST', body: form });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.msg || 'Erro no upload');
+    return data.result; // { fileref, url, embedurl }
+  } catch(e) { showNotif('❌ MixDrop: ' + e.message, 'error'); return null; }
+}
+
+// Bloco HTML reutilizável: upload MixDrop (arquivo ou URL remota) com preenchimento automático do campo de URL
+function mixdropUploadBlockHTML(targetInputId) {
+  return `<div class="admin-section-card" style="border-color:rgba(99,179,237,0.3);background:rgba(99,179,237,0.03)">
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+      <span style="font-size:1.1rem">☁️</span>
+      <span style="font-weight:800;font-size:.8rem;color:#63b3ed;text-transform:uppercase;letter-spacing:.08em">Upload via MixDrop</span>
+    </div>
+    <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">Envie um arquivo de vídeo diretamente ao MixDrop ou informe uma URL remota. A URL embed será preenchida automaticamente.</div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.85rem">
+      <label class="btn btn-ghost" style="font-size:.82rem;cursor:pointer;padding:.45rem 1rem">
+        📁 Enviar arquivo
+        <input type="file" accept="video/*" style="display:none" onchange="mixdropHandleFileUpload(this,'${targetInputId}')">
+      </label>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <input id="mixdropRemoteUrl_${targetInputId}" class="form-input" placeholder="https://... (URL remota do vídeo)" style="border-color:rgba(99,179,237,0.3);flex:1">
+      <button class="btn btn-ghost" style="font-size:.82rem;white-space:nowrap" onclick="mixdropHandleRemoteUpload('${targetInputId}')">⬆️ Enviar URL</button>
+    </div>
+    <div id="mixdropStatus_${targetInputId}" style="font-size:.78rem;color:var(--text3);margin-top:.6rem;min-height:1.2em"></div>
+  </div>`;
+}
+
+async function mixdropHandleFileUpload(input, targetInputId) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('mixdropStatus_' + targetInputId);
+  if (statusEl) statusEl.innerHTML = '⏳ Enviando arquivo para o MixDrop...';
+  showNotif('⏳ Enviando arquivo...', 'success');
+  const result = await mixdropUploadFile(file);
+  if (!result) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ Falha no upload.</span>'; return; }
+  const embedUrl = result.embedurl || result.url || '';
+  const inputEl = document.getElementById(targetInputId);
+  if (inputEl) { inputEl.value = embedUrl; inputEl.dispatchEvent(new Event('input')); }
+  if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80">✅ Upload concluído! fileref: <strong>${result.fileref}</strong> — <a href="${result.url}" target="_blank" style="color:#63b3ed">Abrir</a></span>`;
+  showNotif('✅ MixDrop: upload concluído! URL embed preenchida.', 'success');
+}
+
+async function mixdropHandleRemoteUpload(targetInputId) {
+  const remoteInput = document.getElementById('mixdropRemoteUrl_' + targetInputId);
+  const url = remoteInput?.value.trim();
+  if (!url) { showNotif('❌ Cole a URL remota do vídeo.', 'error'); return; }
+  const statusEl = document.getElementById('mixdropStatus_' + targetInputId);
+  if (statusEl) statusEl.innerHTML = '⏳ Enviando URL remota ao MixDrop...';
+  showNotif('⏳ Enviando URL remota...', 'success');
+  const result = await mixdropRemoteUpload(url);
+  if (!result) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ Falha no remote upload.</span>'; return; }
+  if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80">⏳ Upload enfileirado (ID: <strong>${result.id}</strong>, ref: <strong>${result.fileref}</strong>). Aguarde o processamento...</span>`;
+  // Polling de status
+  let tries = 0;
+  const poll = setInterval(async () => {
+    tries++;
+    const s = await mixdropRemoteStatus(result.id);
+    if (!s) { clearInterval(poll); return; }
+    const done = s.status === 'Complete';
+    const failed = s.status === 'Error';
+    if (statusEl) statusEl.innerHTML = done
+      ? `<span style="color:#4ade80">✅ Pronto! fileref: <strong>${result.fileref}</strong> — <a href="${result.url}" target="_blank" style="color:#63b3ed">Abrir</a></span>`
+      : failed
+        ? `<span style="color:#f87171">❌ Erro: ${sanitize(s.error||'desconhecido')}</span>`
+        : `<span style="color:var(--text3)">⏳ Status: ${sanitize(s.status)} ${s.progress?'('+s.progress+'%)':''}</span>`;
+    if (done) {
+      const embedUrl = result.embedurl || result.url || '';
+      const inputEl = document.getElementById(targetInputId);
+      if (inputEl) { inputEl.value = embedUrl; inputEl.dispatchEvent(new Event('input')); }
+      showNotif('✅ MixDrop: vídeo pronto! URL embed preenchida.', 'success');
+    }
+    if (done || failed || tries >= 30) clearInterval(poll);
+  }, 10000);
+}
+
 function renderAdminSettings(el) {
+  const { email: mdEmail, key: mdKey } = getMixdropCredentials();
   el.innerHTML = `
   <div class="admin-header-bar">
     <div class="admin-page-title">⚙️ Configurações do Site</div>
@@ -3949,11 +4145,61 @@ function renderAdminSettings(el) {
       <div class="form-group"><label class="form-label">Contato de suporte</label><input class="form-input" value="suporte@ritiflix.com"></div>
       <button class="btn btn-red" onclick="showNotif('✅ Configurações salvas!','success')">💾 Salvar</button>
     </div>
+
+    <div class="admin-section-card" style="border-color:rgba(99,179,237,0.3);background:rgba(99,179,237,0.03)">
+      <div class="admin-section-title" style="color:#63b3ed">☁️ MixDrop — Credenciais da API</div>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">
+        Configure seu e-mail e API Key do <a href="https://mixdrop.ag/api/" target="_blank" style="color:#63b3ed">MixDrop</a> para fazer uploads de vídeo diretamente pelo painel. Suas credenciais ficam salvas apenas no seu navegador (localStorage).
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-mail da conta MixDrop</label>
+        <input class="form-input" id="settingsMdEmail" value="${sanitize(mdEmail)}" placeholder="seu@email.com" style="border-color:rgba(99,179,237,0.3)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">API Key do MixDrop</label>
+        <input class="form-input" id="settingsMdKey" value="${sanitize(mdKey)}" placeholder="sVfJ2Ia2b5cRh..." type="password" style="border-color:rgba(99,179,237,0.3)">
+        <div style="font-size:.72rem;color:var(--text3);margin-top:.35rem">Encontre sua API Key em <a href="https://mixdrop.ag/panel/" target="_blank" style="color:#63b3ed">mixdrop.ag/panel/</a> → API.</div>
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-ghost" style="border-color:rgba(99,179,237,0.4);color:#63b3ed" onclick="saveMixdropCredentials()">💾 Salvar credenciais</button>
+        <button class="btn btn-ghost" style="font-size:.8rem" onclick="testMixdropCredentials()">🔍 Testar conexão</button>
+        ${mdEmail ? `<span style="font-size:.78rem;color:#4ade80">✅ Credenciais configuradas</span>` : `<span style="font-size:.78rem;color:var(--text3)">⚠️ Não configurado</span>`}
+      </div>
+    </div>
+
     <div class="admin-section-card">
       <div class="admin-section-title" style="color:var(--gold)">⚠️ Zona de perigo</div>
       <button class="btn btn-ghost" onclick="exportData()">📦 Exportar dados</button>
     </div>
   </div>`;
+}
+
+function saveMixdropCredentials() {
+  const email = document.getElementById('settingsMdEmail')?.value.trim();
+  const key   = document.getElementById('settingsMdKey')?.value.trim();
+  if (!email || !key) { showNotif('❌ Preencha e-mail e API Key.', 'error'); return; }
+  localStorage.setItem('mixdrop_email', email);
+  localStorage.setItem('mixdrop_key', key);
+  showNotif('✅ Credenciais do MixDrop salvas!', 'success');
+  // Re-render para atualizar status
+  setTimeout(() => adminNav('settings', null), 500);
+}
+
+async function testMixdropCredentials() {
+  const { email, key } = getMixdropCredentials();
+  if (!email || !key) { showNotif('❌ Salve as credenciais primeiro.', 'error'); return; }
+  showNotif('⏳ Testando conexão com o MixDrop...', 'success');
+  try {
+    const res = await fetch(`https://api.mixdrop.ag/folderlist?${new URLSearchParams({ email, key })}`);
+    const data = await res.json();
+    if (data.success) {
+      showNotif('✅ MixDrop conectado com sucesso!', 'success');
+    } else {
+      showNotif('❌ MixDrop: credenciais inválidas.', 'error');
+    }
+  } catch(e) {
+    showNotif('❌ Erro ao conectar: ' + e.message, 'error');
+  }
 }
 
 async function exportData() {
