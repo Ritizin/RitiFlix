@@ -2984,7 +2984,7 @@ function setAdminAnimeFilter(key) {
   adminAnimeSearch = '';
   renderAdminAnimes(document.getElementById('adminContent'));
 }
-function animeCardHTML(a) {
+function adminAnimeCardHTML(a) {
   const movie = isAnimeMovie(a);
   return `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='rgba(229,9,20,0.5)'" onmouseout="this.style.borderColor='var(--border)'">
@@ -3009,7 +3009,7 @@ function animeCardHTML(a) {
 }
 function animesGridHTML(animes) {
   return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
-    ${animes.length === 0 ? `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text3)">Nenhum título nesta categoria ainda.</div>` : animes.map(animeCardHTML).join('')}
+    ${animes.length === 0 ? `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text3)">Nenhum título nesta categoria ainda.</div>` : animes.map(adminAnimeCardHTML).join('')}
   </div>`;
 }
 function collectionCardHTML(name, items) {
