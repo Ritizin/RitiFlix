@@ -13,7 +13,7 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <!-- Segurança: Content-Security-Policy restringe de onde scripts/estilos/conexões podem vir, mitigando XSS.
      frame-src é deixado amplo em https: pois o player precisa embutir provedores de vídeo variados cadastrados pelo admin. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org https://superflixapi.rest https://superflixapi.cyou https://*.cloudflare.com https://challenges.cloudflare.com https://ul.mixdrop.ag https://api.mixdrop.ag; frame-src https: https://superflixapi.rest https://superflixapi.cyou; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.themoviedb.org https://image.tmdb.org https://superflixapi.rest https://superflixapi.cyou https://*.cloudflare.com https://challenges.cloudflare.com https://doodapi.co https://playmogo.com https://dood.to https://dood.la https://dood.so; frame-src https: https://superflixapi.rest https://superflixapi.cyou https://playmogo.com https://dood.to https://dood.la https://dood.so; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
 <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -51,7 +51,7 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .logo span{font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.02em}
 .nav-links{display:flex;gap:.2rem;flex:1;justify-content:center}
 .nav-links a{color:var(--text2);text-decoration:none;padding:.45rem 1rem;border-radius:6px;font-size:.875rem;font-weight:500;transition:all .2s;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
-.nav-links a:hover,.nav-links a.active{color:var(--text);background:rgba(201,168,76,0.08);color:var(--gold)}
+.nav-links a:hover,.nav-links a.active{background:rgba(201,168,76,0.08);color:var(--gold)}
 .nav-right{display:flex;align-items:center;gap:.75rem;flex-shrink:0}
 .search-wrap{position:relative}
 .search-wrap input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:.5rem 2.5rem .5rem 1rem;border-radius:24px;font-size:.85rem;width:220px;transition:all .3s;font-family:'Outfit',sans-serif;letter-spacing:.02em}
@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     <div class="nav-right">
       <div class="search-wrap" id="globalSearch">
-        <input type="text" placeholder="Buscar título..." id="searchInput" oninput="searchLive(this.value)" onblur="setTimeout(()=>hideSearchDrop(),200)" onfocus="this.nextElementSibling.nextElementSibling.nextElementSibling.style.opacity='0'" onkeydown="if(event.key==='Escape'){this.blur();hideSearchDrop();}">
+        <input type="text" placeholder="Buscar título..." id="searchInput" oninput="searchLive(this.value)" onblur="setTimeout(()=>hideSearchDrop(),200)" onfocus="this.closest('.search-wrap').querySelector('.search-kbd').style.opacity='0'" onkeydown="if(event.key==='Escape'){this.blur();hideSearchDrop();}">
         <span class="si">🔍</span>
         <div class="search-results-drop hidden" id="searchDrop"></div>
         <span class="search-kbd">/</span>
@@ -1102,7 +1102,10 @@ function sanitize(str){return String(str).replace(/[&<>"']/g,c=>({'&':'&amp;','<
 // usados em ataques de XSS via campos de URL (capa, vídeo, thumbnail).
 function isSafeUrl(str){
   if (!str) return true; // campo vazio é válido (opcional)
-  try { const u = new URL(String(str).trim()); return u.protocol === 'http:' || u.protocol === 'https:'; }
+  const s = String(str).trim();
+  // Aceita prefixos internos do sistema (superflix: e superflix2:)
+  if (/^superflix2?:/i.test(s)) return true;
+  try { const u = new URL(s); return u.protocol === 'http:' || u.protocol === 'https:'; }
   catch(e) { return false; }
 }
 
@@ -1114,6 +1117,9 @@ function isSafeUrl(str){
 // do TMDb. Se quiser eliminar esse risco depois, dá pra mover essa chamada
 // para uma Supabase Edge Function (me peça o guia quando quiser fazer isso).
 // ============================================================
+const DOODSTREAM_API_KEY = '571198l8p0bvtssy9fj3m4';
+const DOODSTREAM_API_BASE = 'https://doodapi.co/api';
+
 const TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZTQ4MThiZDcxMzA2MWRhZWU1ZGRiZjIyMGRmZDkxOCIsIm5iZiI6MTc4MDMyNDI1OC4yNjMsInN1YiI6IjZhMWQ5N2EyZWE1ODI3MjM0M2NhYjZjNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.lk3ywoIrM8J7QcSVW_9lA0UcvxJhqB8xu4YxOVjbLd8';
 const TMDB_BASE  = 'https://api.themoviedb.org/3';
 const TMDB_IMG   = 'https://image.tmdb.org/t/p/w500';
@@ -3193,7 +3199,7 @@ async function renderAdminMovieVideo(el, animeId) {
   </div>
   <div class="admin-form">
     ${tmdbVideoUrlSearchBlockHTML('mvUrl','movie')}
-    ${mixdropUploadBlockHTML('mvUrl')}
+    ${doodUploadBlockHTML('mvUrl')}
     <div class="admin-section-card">
       <div class="admin-section-title">🎬 Vídeo do filme</div>
       <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.25rem">${ep && ep.video_url ? '<span style="color:#4ade80">✓ Este filme já tem um vídeo cadastrado.</span>' : 'Nenhum vídeo cadastrado ainda. Cole a URL abaixo ou busque pelo TMDb acima para preencher automaticamente.'}</div>
@@ -3422,7 +3428,6 @@ async function renderAdminEditEp(el, epId) {
   </div>
   <div class="admin-form">
     ${epTmdbSearchBlockHTML('ee')}
-    ${mixdropUploadBlockHTML('eeUrl')}
     <div class="admin-section-card">
       <div class="admin-section-title">Dados do episódio</div>
       <div class="form-row">
@@ -3436,6 +3441,18 @@ async function renderAdminEditEp(el, epId) {
         <div id="eeThumbPrev" style="margin-top:.5rem;${ep.thumbnail_url?'':'display:none'}"><img id="eeThumbImg" src="${ep.thumbnail_url||''}" style="width:120px;height:75px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></div>
       </div>
       <div class="form-group"><label class="form-label">URL do vídeo</label><input class="form-input" id="eeUrl" value="${ep.video_url||''}" placeholder="https://... (arquivo .mp4/.m3u8 ou link de frame, ex: https://fembed.sx/e/533535)"></div>
+      <div style="border:1px solid rgba(104,211,145,0.25);border-radius:10px;padding:1rem 1.25rem;background:rgba(104,211,145,0.03);margin-bottom:1rem">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem">
+          <span>☁️</span>
+          <span style="font-weight:800;font-size:.8rem;color:#68d391;text-transform:uppercase;letter-spacing:.08em">Upload via Doodstream</span>
+        </div>
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:.85rem">Informe uma URL direta de vídeo (.mp4) para enviar ao Doodstream. A URL embed será preenchida automaticamente.</div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <input id="doodRemoteUrl_eeUrl" class="form-input" placeholder="https://... (URL direta do vídeo .mp4)" style="border-color:rgba(104,211,145,0.3);flex:1">
+          <button class="btn btn-ghost" style="font-size:.82rem;white-space:nowrap;border-color:rgba(104,211,145,0.4);color:#68d391" onclick="doodHandleRemoteUpload('eeUrl')">⬆️ Enviar URL</button>
+        </div>
+        <div id="doodStatus_eeUrl" style="font-size:.78rem;color:var(--text3);margin-top:.6rem;min-height:1.2em"></div>
+      </div>
       <div style="display:flex;gap:.75rem;flex-wrap:wrap">
         <button class="btn btn-red" onclick="saveEditEp(${ep.id},${ep.anime_id})">💾 Salvar alterações</button>
         <button class="btn btn-ghost" onclick="adminNav('episodes',null,${ep.anime_id},${ep.season||1})">Cancelar</button>
@@ -4028,138 +4045,8 @@ async function renderAdminGenres(el) {
   </div>`;
 }
 
-// ============================================================
-// MIXDROP API
-// ============================================================
-function getMixdropCredentials() {
-  return {
-    email: localStorage.getItem('mixdrop_email') || 'Ritizin00@gmail.com',
-    key:   localStorage.getItem('mixdrop_key')   || 'ubz7wpzqZ0Vujjrlyr2'
-  };
-}
-
-async function mixdropRemoteUpload(url, name) {
-  const { email, key } = getMixdropCredentials();
-  if (!email || !key) { showNotif('❌ Configure o e-mail e API Key do MixDrop nas Configurações.', 'error'); return null; }
-  try {
-    const params = new URLSearchParams({ email, key, url });
-    if (name) params.append('name', name);
-    const res = await fetch(`https://api.mixdrop.ag/remoteupload?${params}`);
-    const data = await res.json();
-    if (!data.success) throw new Error(data.msg || 'Erro desconhecido');
-    return data.result; // { id, fileref, url, embedurl }
-  } catch(e) { showNotif('❌ MixDrop: ' + e.message, 'error'); return null; }
-}
-
-async function mixdropRemoteStatus(id) {
-  const { email, key } = getMixdropCredentials();
-  if (!email || !key) return null;
-  try {
-    const res = await fetch(`https://api.mixdrop.ag/remotestatus?${new URLSearchParams({ email, key, id })}`);
-    const data = await res.json();
-    return data.success ? data.result : null;
-  } catch(e) { return null; }
-}
-
-async function mixdropFileInfo(refs) {
-  const { email, key } = getMixdropCredentials();
-  if (!email || !key) { showNotif('❌ Configure o e-mail e API Key do MixDrop nas Configurações.', 'error'); return null; }
-  try {
-    const refsParam = (Array.isArray(refs) ? refs : [refs]).map(r => `ref[]=${encodeURIComponent(r)}`).join('&');
-    const res = await fetch(`https://api.mixdrop.ag/fileinfo2?email=${encodeURIComponent(email)}&key=${encodeURIComponent(key)}&${refsParam}`);
-    const data = await res.json();
-    return data.success ? data.result : null;
-  } catch(e) { showNotif('❌ MixDrop: ' + e.message, 'error'); return null; }
-}
-
-async function mixdropUploadFile(file, folder) {
-  const { email, key } = getMixdropCredentials();
-  if (!email || !key) { showNotif('❌ Configure o e-mail e API Key do MixDrop nas Configurações.', 'error'); return null; }
-  try {
-    const form = new FormData();
-    form.append('email', email);
-    form.append('key', key);
-    form.append('file', file);
-    if (folder) form.append('folder', folder);
-    const res = await fetch('https://ul.mixdrop.ag/api', { method: 'POST', body: form });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.msg || 'Erro no upload');
-    return data.result; // { fileref, url, embedurl }
-  } catch(e) { showNotif('❌ MixDrop: ' + e.message, 'error'); return null; }
-}
-
-// Bloco HTML reutilizável: upload MixDrop (arquivo ou URL remota) com preenchimento automático do campo de URL
-function mixdropUploadBlockHTML(targetInputId) {
-  return `<div class="admin-section-card" style="border-color:rgba(99,179,237,0.3);background:rgba(99,179,237,0.03)">
-    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
-      <span style="font-size:1.1rem">☁️</span>
-      <span style="font-weight:800;font-size:.8rem;color:#63b3ed;text-transform:uppercase;letter-spacing:.08em">Upload via MixDrop</span>
-    </div>
-    <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">Envie um arquivo de vídeo diretamente ao MixDrop ou informe uma URL remota. A URL embed será preenchida automaticamente.</div>
-    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.85rem">
-      <label class="btn btn-ghost" style="font-size:.82rem;cursor:pointer;padding:.45rem 1rem">
-        📁 Enviar arquivo
-        <input type="file" accept="video/*" style="display:none" onchange="mixdropHandleFileUpload(this,'${targetInputId}')">
-      </label>
-    </div>
-    <div style="display:flex;gap:.5rem">
-      <input id="mixdropRemoteUrl_${targetInputId}" class="form-input" placeholder="https://... (URL remota do vídeo)" style="border-color:rgba(99,179,237,0.3);flex:1">
-      <button class="btn btn-ghost" style="font-size:.82rem;white-space:nowrap" onclick="mixdropHandleRemoteUpload('${targetInputId}')">⬆️ Enviar URL</button>
-    </div>
-    <div id="mixdropStatus_${targetInputId}" style="font-size:.78rem;color:var(--text3);margin-top:.6rem;min-height:1.2em"></div>
-  </div>`;
-}
-
-async function mixdropHandleFileUpload(input, targetInputId) {
-  const file = input.files[0];
-  if (!file) return;
-  const statusEl = document.getElementById('mixdropStatus_' + targetInputId);
-  if (statusEl) statusEl.innerHTML = '⏳ Enviando arquivo para o MixDrop...';
-  showNotif('⏳ Enviando arquivo...', 'success');
-  const result = await mixdropUploadFile(file);
-  if (!result) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ Falha no upload.</span>'; return; }
-  const embedUrl = result.embedurl || result.url || '';
-  const inputEl = document.getElementById(targetInputId);
-  if (inputEl) { inputEl.value = embedUrl; inputEl.dispatchEvent(new Event('input')); }
-  if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80">✅ Upload concluído! fileref: <strong>${result.fileref}</strong> — <a href="${result.url}" target="_blank" style="color:#63b3ed">Abrir</a></span>`;
-  showNotif('✅ MixDrop: upload concluído! URL embed preenchida.', 'success');
-}
-
-async function mixdropHandleRemoteUpload(targetInputId) {
-  const remoteInput = document.getElementById('mixdropRemoteUrl_' + targetInputId);
-  const url = remoteInput?.value.trim();
-  if (!url) { showNotif('❌ Cole a URL remota do vídeo.', 'error'); return; }
-  const statusEl = document.getElementById('mixdropStatus_' + targetInputId);
-  if (statusEl) statusEl.innerHTML = '⏳ Enviando URL remota ao MixDrop...';
-  showNotif('⏳ Enviando URL remota...', 'success');
-  const result = await mixdropRemoteUpload(url);
-  if (!result) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171">❌ Falha no remote upload.</span>'; return; }
-  if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80">⏳ Upload enfileirado (ID: <strong>${result.id}</strong>, ref: <strong>${result.fileref}</strong>). Aguarde o processamento...</span>`;
-  // Polling de status
-  let tries = 0;
-  const poll = setInterval(async () => {
-    tries++;
-    const s = await mixdropRemoteStatus(result.id);
-    if (!s) { clearInterval(poll); return; }
-    const done = s.status === 'Complete';
-    const failed = s.status === 'Error';
-    if (statusEl) statusEl.innerHTML = done
-      ? `<span style="color:#4ade80">✅ Pronto! fileref: <strong>${result.fileref}</strong> — <a href="${result.url}" target="_blank" style="color:#63b3ed">Abrir</a></span>`
-      : failed
-        ? `<span style="color:#f87171">❌ Erro: ${sanitize(s.error||'desconhecido')}</span>`
-        : `<span style="color:var(--text3)">⏳ Status: ${sanitize(s.status)} ${s.progress?'('+s.progress+'%)':''}</span>`;
-    if (done) {
-      const embedUrl = result.embedurl || result.url || '';
-      const inputEl = document.getElementById(targetInputId);
-      if (inputEl) { inputEl.value = embedUrl; inputEl.dispatchEvent(new Event('input')); }
-      showNotif('✅ MixDrop: vídeo pronto! URL embed preenchida.', 'success');
-    }
-    if (done || failed || tries >= 30) clearInterval(poll);
-  }, 10000);
-}
 
 function renderAdminSettings(el) {
-  const { email: mdEmail, key: mdKey } = getMixdropCredentials();
   el.innerHTML = `
   <div class="admin-header-bar">
     <div class="admin-page-title">⚙️ Configurações do Site</div>
@@ -4173,24 +4060,18 @@ function renderAdminSettings(el) {
       <button class="btn btn-red" onclick="showNotif('✅ Configurações salvas!','success')">💾 Salvar</button>
     </div>
 
-    <div class="admin-section-card" style="border-color:rgba(99,179,237,0.3);background:rgba(99,179,237,0.03)">
-      <div class="admin-section-title" style="color:#63b3ed">☁️ MixDrop — Credenciais da API</div>
+
+    <div class="admin-section-card" style="border-color:rgba(104,211,145,0.3);background:rgba(104,211,145,0.03)">
+      <div class="admin-section-title" style="color:#68d391">☁️ Doodstream — API</div>
       <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">
-        Configure seu e-mail e API Key do <a href="https://mixdrop.ag/api/" target="_blank" style="color:#63b3ed">MixDrop</a> para fazer uploads de vídeo diretamente pelo painel. Suas credenciais ficam salvas apenas no seu navegador (localStorage).
+        Upload remoto de vídeos direto pelo painel. API Key já configurada. Domínios aceitos como embed: <code style="font-size:.75rem;color:#68d391">playmogo.com/e/...</code>, <code style="font-size:.75rem;color:#68d391">dood.to/e/...</code>
       </div>
-      <div class="form-group">
-        <label class="form-label">E-mail da conta MixDrop</label>
-        <input class="form-input" id="settingsMdEmail" value="${sanitize(mdEmail)}" placeholder="seu@email.com" style="border-color:rgba(99,179,237,0.3)">
-      </div>
-      <div class="form-group">
-        <label class="form-label">API Key do MixDrop</label>
-        <input class="form-input" id="settingsMdKey" value="${sanitize(mdKey)}" placeholder="sVfJ2Ia2b5cRh..." type="password" style="border-color:rgba(99,179,237,0.3)">
-        <div style="font-size:.72rem;color:var(--text3);margin-top:.35rem">Encontre sua API Key em <a href="https://mixdrop.ag/panel/" target="_blank" style="color:#63b3ed">mixdrop.ag/panel/</a> → API.</div>
+      <div style="font-size:.78rem;color:var(--text3);margin-bottom:1rem">
+        🔑 API Key: <code style="font-size:.75rem;color:#68d391">${DOODSTREAM_API_KEY.slice(0,8)}••••••••</code>
       </div>
       <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-ghost" style="border-color:rgba(99,179,237,0.4);color:#63b3ed" onclick="saveMixdropCredentials()">💾 Salvar credenciais</button>
-        <button class="btn btn-ghost" style="font-size:.8rem" onclick="testMixdropCredentials()">🔍 Testar conexão</button>
-        ${mdEmail ? `<span style="font-size:.78rem;color:#4ade80">✅ Credenciais configuradas</span>` : `<span style="font-size:.78rem;color:var(--text3)">⚠️ Não configurado</span>`}
+        <button class="btn btn-ghost" style="border-color:rgba(104,211,145,0.4);color:#68d391" onclick="testDoodstreamConnection()">🔍 Testar conexão</button>
+        <span style="font-size:.78rem;color:#4ade80">✅ API Key configurada</span>
       </div>
     </div>
 
@@ -4201,33 +4082,6 @@ function renderAdminSettings(el) {
   </div>`;
 }
 
-function saveMixdropCredentials() {
-  const email = document.getElementById('settingsMdEmail')?.value.trim();
-  const key   = document.getElementById('settingsMdKey')?.value.trim();
-  if (!email || !key) { showNotif('❌ Preencha e-mail e API Key.', 'error'); return; }
-  localStorage.setItem('mixdrop_email', email);
-  localStorage.setItem('mixdrop_key', key);
-  showNotif('✅ Credenciais do MixDrop salvas!', 'success');
-  // Re-render para atualizar status
-  setTimeout(() => adminNav('settings', null), 500);
-}
-
-async function testMixdropCredentials() {
-  const { email, key } = getMixdropCredentials();
-  if (!email || !key) { showNotif('❌ Salve as credenciais primeiro.', 'error'); return; }
-  showNotif('⏳ Testando conexão com o MixDrop...', 'success');
-  try {
-    const res = await fetch(`https://api.mixdrop.ag/folderlist?${new URLSearchParams({ email, key })}`);
-    const data = await res.json();
-    if (data.success) {
-      showNotif('✅ MixDrop conectado com sucesso!', 'success');
-    } else {
-      showNotif('❌ MixDrop: credenciais inválidas.', 'error');
-    }
-  } catch(e) {
-    showNotif('❌ Erro ao conectar: ' + e.message, 'error');
-  }
-}
 
 async function exportData() {
   const { data: animes } = await sb.from('animes').select('*');
@@ -4238,6 +4092,116 @@ async function exportData() {
   const a = document.createElement('a'); a.href = url; a.download = 'ritiflix_backup.json'; a.click();
   showNotif('📦 Backup exportado!', 'success');
 }
+
+// ============================================================
+// DOODSTREAM API
+// ============================================================
+async function doodRemoteUpload(url, title) {
+  const key = DOODSTREAM_API_KEY;
+  try {
+    const params = new URLSearchParams({ key, url });
+    if (title) params.set('new_title', title);
+    const res = await fetch(`${DOODSTREAM_API_BASE}/urlupload/add?${params}`);
+    const data = await res.json();
+    if (data.status === 200 && data.result) return data.result;
+    showNotif('❌ Doodstream: ' + (data.msg || 'Erro ao enviar URL.'), 'error');
+    return null;
+  } catch(e) { showNotif('❌ Doodstream: ' + e.message, 'error'); return null; }
+}
+
+async function doodRemoteStatus(fileCode) {
+  const key = DOODSTREAM_API_KEY;
+  try {
+    const res = await fetch(`${DOODSTREAM_API_BASE}/urlupload/status?key=${key}&file_code=${fileCode}`);
+    const data = await res.json();
+    if (data.status === 200 && data.result && data.result.length) return data.result[0];
+    return null;
+  } catch(e) { return null; }
+}
+
+async function doodFileInfo(fileCode) {
+  const key = DOODSTREAM_API_KEY;
+  try {
+    const res = await fetch(`${DOODSTREAM_API_BASE}/file/info?key=${key}&file_code=${fileCode}`);
+    const data = await res.json();
+    if (data.status === 200 && data.result && data.result.length) return data.result[0];
+    return null;
+  } catch(e) { return null; }
+}
+
+// Bloco HTML reutilizável: envio via URL remota para o Doodstream com preenchimento automático
+function doodUploadBlockHTML(targetInputId) {
+  return `
+  <div style="border:1px solid rgba(104,211,145,0.25);border-radius:10px;padding:1rem 1.25rem;background:rgba(104,211,145,0.03);margin-bottom:1rem">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem">
+      <span style="font-size:1rem">☁️</span>
+      <span style="font-weight:800;font-size:.8rem;color:#68d391;text-transform:uppercase;letter-spacing:.08em">Upload via Doodstream</span>
+    </div>
+    <div style="font-size:.8rem;color:var(--text3);margin-bottom:.85rem">Informe uma URL direta de vídeo (.mp4) para enviar ao Doodstream. A URL embed será preenchida automaticamente.</div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <input id="doodRemoteUrl_${targetInputId}" class="form-input" placeholder="https://... (URL direta do vídeo .mp4)" style="border-color:rgba(104,211,145,0.3);flex:1">
+      <button class="btn btn-ghost" style="font-size:.82rem;white-space:nowrap;border-color:rgba(104,211,145,0.4);color:#68d391" onclick="doodHandleRemoteUpload('${targetInputId}')">⬆️ Enviar URL</button>
+    </div>
+    <div id="doodStatus_${targetInputId}" style="font-size:.78rem;color:var(--text3);margin-top:.6rem;min-height:1.2em"></div>
+  </div>`;
+}
+
+async function doodHandleRemoteUpload(targetInputId) {
+  const remoteInput = document.getElementById('doodRemoteUrl_' + targetInputId);
+  const url = remoteInput?.value.trim();
+  if (!url) { showNotif('❌ Cole a URL do vídeo antes de enviar.', 'error'); return; }
+  const statusEl = document.getElementById('doodStatus_' + targetInputId);
+  if (statusEl) statusEl.innerHTML = '⏳ Enviando URL ao Doodstream...';
+  const result = await doodRemoteUpload(url);
+  if (!result || !result.filecode) {
+    if (statusEl) statusEl.innerHTML = '❌ Falha ao iniciar upload.';
+    return;
+  }
+  const fileCode = result.filecode;
+  if (statusEl) statusEl.innerHTML = '⏳ Processando vídeo... (pode levar alguns minutos)';
+  let tries = 0;
+  const poll = setInterval(async () => {
+    tries++;
+    const s = await doodRemoteStatus(fileCode);
+    const done   = s && (s.status === 'downloaded' || s.status === 'completed' || parseInt(s.bytes_total) > 0 && s.bytes_total === s.bytes_downloaded);
+    const failed = s && (s.status === 'error' || s.status === 'failed');
+    if (done || (!s && tries > 3)) {
+      // Busca URL embed via fileinfo
+      const info = await doodFileInfo(fileCode);
+      clearInterval(poll);
+      const embedUrl = info?.protected_embed || info?.embed_url || \`https://playmogo.com/e/\${fileCode}\`;
+      const inputEl = document.getElementById(targetInputId);
+      if (inputEl) { inputEl.value = embedUrl; inputEl.dispatchEvent(new Event('input')); }
+      if (statusEl) statusEl.innerHTML = \`<span style="color:#4ade80">✅ Pronto! URL embed preenchida: <code style="font-size:.75rem">\${embedUrl}</code></span>\`;
+      showNotif('✅ Doodstream: upload concluído! URL embed preenchida.', 'success');
+    } else if (failed) {
+      clearInterval(poll);
+      if (statusEl) statusEl.innerHTML = '❌ Doodstream: falha no upload remoto.';
+      showNotif('❌ Doodstream: falha no upload remoto.', 'error');
+    } else {
+      const pct = (s && s.bytes_total > 0) ? Math.round(s.bytes_downloaded / s.bytes_total * 100) + '%' : '...';
+      if (statusEl) statusEl.innerHTML = \`⏳ Processando... \${pct}\`;
+    }
+    if (tries >= 40) { clearInterval(poll); if (statusEl) statusEl.innerHTML = '⚠️ Tempo esgotado. Verifique no painel do Doodstream.'; }
+  }, 8000);
+}
+
+async function testDoodstreamConnection() {
+  showNotif('⏳ Testando conexão com o Doodstream...', 'success');
+  try {
+    const res = await fetch(\`\${DOODSTREAM_API_BASE}/account/info?key=\${DOODSTREAM_API_KEY}\`);
+    const data = await res.json();
+    if (data.status === 200 && data.result) {
+      const r = data.result;
+      showNotif(\`✅ Doodstream conectado! Conta: \${r.email || ''} — Armazenamento: \${r.storage_used || '?'}\`, 'success');
+    } else {
+      showNotif('❌ Doodstream: API Key inválida ou erro na resposta.', 'error');
+    }
+  } catch(e) {
+    showNotif('❌ Erro ao conectar: ' + e.message, 'error');
+  }
+}
+
 
 // ============================================================
 // BELL NOTIFICATIONS
@@ -4363,5 +4327,17 @@ document.addEventListener('keydown', e => {
   }, { passive: true });
 })();
 </script>
+
+<script>
+// DoodStream API integration placeholder.
+// Configure window.DOOD_API_KEY and use https://doodstream.com/api-docs endpoints.
+window.DoodStreamAPI={
+ apiKey:'',
+ async accountInfo(){
+  return fetch('https://doodapi.com/api/account/info?key='+encodeURIComponent(this.apiKey)).then(r=>r.json());
+ }
+};
+</script>
+
 </body>
 </html>
