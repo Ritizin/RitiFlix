@@ -426,7 +426,7 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .detail-poster-img{width:100%;height:100%;object-fit:cover;border-radius:14px}
 /* ── SEARCH KEYBOARD SHORTCUT BADGE ── */
 .search-kbd{position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:var(--bg4);border:1px solid var(--border);border-radius:4px;font-size:.65rem;color:var(--text3);padding:.15rem .35rem;pointer-events:none;font-family:monospace;transition:opacity .2s}
-input:focus~.search-kbd,.search-wrap input:focus+.si+.search-kbd{opacity:0}
+input:focus~.search-kbd,.search-wrap input:focus~.search-kbd{opacity:0}
 /* ── CONTINUE WATCHING CARDS ── */
 .continue-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .2s}
 .continue-card:hover{border-color:rgba(201,168,76,.3);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.5)}
@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     <div class="nav-right">
       <div class="search-wrap" id="globalSearch">
-        <input type="text" placeholder="Buscar título..." id="searchInput" oninput="searchLive(this.value)" onblur="setTimeout(()=>hideSearchDrop(),200)" onfocus="this.closest('.search-wrap').querySelector('.search-kbd').style.opacity='0'" onkeydown="if(event.key==='Escape'){this.blur();hideSearchDrop();}">
+        <input type="text" placeholder="Buscar título..." id="searchInput" oninput="searchLive(this.value)" onblur="setTimeout(()=>hideSearchDrop(),200);this.closest('.search-wrap').querySelector('.search-kbd').style.opacity=''" onfocus="this.closest('.search-wrap').querySelector('.search-kbd').style.opacity='0'" onkeydown="if(event.key==='Escape'){this.blur();hideSearchDrop();}">
         <span class="si">🔍</span>
         <div class="search-results-drop hidden" id="searchDrop"></div>
         <span class="search-kbd">/</span>
@@ -2214,7 +2214,6 @@ function EmbedPlayer(t, i, s, e, baseUrl) {
   iframe.height = '100%';
   iframe.frameBorder = '0';
   iframe.setAttribute('allow', 'autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *; web-share *');
-  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
   iframe.allowFullscreen = true;
   iframe.setAttribute('webkitallowfullscreen', '');
   iframe.setAttribute('mozallowfullscreen', '');
@@ -4339,10 +4338,243 @@ document.addEventListener('keydown', e => {
 window.DoodStreamAPI={
  apiKey:'',
  async accountInfo(){
-  return fetch('https://doodapi.com/api/account/info?key='+encodeURIComponent(this.apiKey)).then(r=>r.json());
+  return fetch('https://doodapi.co/api/account/info?key='+encodeURIComponent(this.apiKey)).then(r=>r.json());
  }
 };
 </script>
 
+<script>
+// ============================================================
+// RITITFLIX — ADBLOCK NATIVO
+// Bloqueia popups, overlays, redirects e requisições a redes
+// de anúncios sem depender de extensão externa.
+// ============================================================
+(function() {
+  'use strict';
+
+  // ── 1. LISTA DE DOMÍNIOS BLOQUEADOS ───────────────────────
+  const AD_HOSTS = [
+    'doubleclick.net','googlesyndication.com','googleadservices.com',
+    'adservice.google.com','adnxs.com','advertising.com','ads.yahoo.com',
+    'outbrain.com','taboola.com','revcontent.com','popads.net','popcash.net',
+    'propellerads.com','adsterra.com','hilltopads.net','trafficjunky.com',
+    'exoclick.com','juicyads.com','trafficstars.com','plugrush.com',
+    'adcash.com','clickaine.com','zeropark.com','richpush.co',
+    'mgid.com','voluumtrk.com','engageya.com','adskeeper.co.uk',
+    'adtelligent.com','smartadserver.com','rubiconproject.com',
+    'openx.net','pubmatic.com','appnexus.com','criteo.com','sovrn.com',
+    'lijit.com','33across.com','sharethrough.com','triplelift.com',
+    'indexexchange.com','yieldmo.com','spotxchange.com','spotx.tv',
+    'springserve.com','freewheel.tv','moatads.com','adsafeprotected.com',
+    'scorecardresearch.com','quantserve.com','comscore.com',
+    'amazon-adsystem.com','media.net','contextweb.com','casalemedia.com',
+    'ads.twitter.com','ads.facebook.com','ads.linkedin.com',
+    'bidswitch.net','lkqd.net','undertone.com','synacor.com',
+    'adblade.com','adhigh.net','adform.net','adform.com',
+    'mathtag.com','bluekai.com','lotame.com','krux.com',
+    'demdex.net','adsrvr.org','turn.com','mxpnl.com',
+    'popunder.net','trafficshop.com','a-ads.com','coinzilla.io',
+    'ad.plus','adhese.com','adhese.net','admixer.net',
+    'adcolony.com','ironsrc.com','applovin.com','chartboost.com',
+    'unityads.unity3d.com','vungle.com','inmobi.com',
+    'hotjar.com','mouseflow.com','fullstory.com',
+  ];
+
+  // Converte para Set de partes de host para lookup rápido
+  const AD_SET = new Set(AD_HOSTS);
+
+  function isAdHost(url) {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      if (AD_SET.has(host)) return true;
+      // Verifica subdomínios: ads.exemplo.com → exemplo.com
+      const parts = host.split('.');
+      for (let i = 1; i < parts.length - 1; i++) {
+        if (AD_SET.has(parts.slice(i).join('.'))) return true;
+      }
+    } catch(e) {}
+    return false;
+  }
+
+  // ── 2. BLOQUEIA window.open (popups / pop-unders) ─────────
+  const _origOpen = window.open;
+  window.open = function(url, ...args) {
+    if (!url) return null;
+    try {
+      // Permite apenas abrir dentro do mesmo domínio ou URLs conhecidas e seguras
+      const u = new URL(url, location.href);
+      if (isAdHost(u.href)) { console.debug('[AdBlock] window.open bloqueado:', url); return null; }
+      // Bloqueia aberturas sem interação do usuário (sem trusted event na call stack)
+      if (!window._userInteracting) { console.debug('[AdBlock] window.open bloqueado (sem interação):', url); return null; }
+    } catch(e) { return null; }
+    return _origOpen.call(window, url, ...args);
+  };
+
+  // Rastreia interação do usuário para distinguir popups legítimos
+  let _uiTimer;
+  ['click','keydown','touchstart'].forEach(ev =>
+    document.addEventListener(ev, () => {
+      window._userInteracting = true;
+      clearTimeout(_uiTimer);
+      _uiTimer = setTimeout(() => { window._userInteracting = false; }, 1000);
+    }, true)
+  );
+
+  // ── 3. INTERCEPTA fetch ────────────────────────────────────
+  const _origFetch = window.fetch;
+  window.fetch = function(input, init) {
+    const url = typeof input === 'string' ? input : (input?.url || '');
+    if (isAdHost(url)) {
+      console.debug('[AdBlock] fetch bloqueado:', url);
+      return Promise.reject(new TypeError('AdBlock: requisição bloqueada'));
+    }
+    return _origFetch.apply(this, arguments);
+  };
+
+  // ── 4. INTERCEPTA XMLHttpRequest ──────────────────────────
+  const _origXHROpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    if (isAdHost(url)) {
+      console.debug('[AdBlock] XHR bloqueado:', url);
+      Object.defineProperty(this, '_blocked', { value: true });
+    }
+    return _origXHROpen.call(this, method, url, ...rest);
+  };
+  const _origXHRSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function(...args) {
+    if (this._blocked) return;
+    return _origXHRSend.apply(this, args);
+  };
+
+  // ── 5. INTERCEPTA criação de <script> e <iframe> de anúncios via DOM
+  const _origCreateElement = document.createElement.bind(document);
+  document.createElement = function(tag, ...args) {
+    const el = _origCreateElement(tag, ...args);
+    if (tag.toLowerCase() === 'script') {
+      const _origSetSrc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+      if (_origSetSrc) {
+        const origSet = _origSetSrc.set;
+        const origGet = _origSetSrc.get;
+        Object.defineProperty(el, 'src', {
+          get() { return origGet.call(this); },
+          set(val) {
+            if (isAdHost(val)) { console.debug('[AdBlock] script bloqueado:', val); return; }
+            origSet.call(this, val);
+          },
+          configurable: true,
+        });
+      }
+    }
+    return el;
+  };
+
+  // ── 6. MutationObserver — remove elementos de anúncio injetados ──
+  const AD_SELECTORS = [
+    'iframe[src*="doubleclick"]','iframe[src*="googlesyndication"]',
+    'iframe[src*="adnxs"]','iframe[src*="advertising.com"]',
+    'iframe[src*="popads"]','iframe[src*="popcash"]',
+    'iframe[src*="propellerads"]','iframe[src*="adsterra"]',
+    'iframe[src*="exoclick"]','iframe[src*="trafficjunky"]',
+    'div[id*="ad-"]','div[id*="_ad_"]','div[class*="ad-banner"]',
+    'div[class*="adbox"]','div[class*="ad-slot"]','div[class*="adsbox"]',
+    'div[id^="google_ads"]','ins.adsbygoogle',
+    '[id*="popunder"]','[class*="popunder"]',
+    '[id*="pop-up"]','[id*="popup-ad"]',
+  ].join(',');
+
+  function cleanAds(root) {
+    try {
+      root.querySelectorAll(AD_SELECTORS).forEach(el => {
+        // Não remove elementos internos do RitiFlix
+        if (!el.closest('#page-home,#page-search,#page-detail,#page-player,#page-admin,#page-profile,#navbar,.modal-overlay,.mobile-nav')) {
+          console.debug('[AdBlock] elemento removido:', el);
+          el.remove();
+        }
+      });
+    } catch(e) {}
+  }
+
+  const observer = new MutationObserver(mutations => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        // Checa o próprio nó
+        try {
+          if (node.matches && node.matches(AD_SELECTORS)) {
+            const src = node.src || node.getAttribute('src') || '';
+            if (isAdHost(src) || node.id?.includes('ad') || node.className?.includes('ad')) {
+              console.debug('[AdBlock] nó removido via MutationObserver:', node);
+              node.remove(); continue;
+            }
+          }
+        } catch(e) {}
+        // Checa iframes com src de anúncio
+        if (node.tagName === 'IFRAME') {
+          const src = node.src || node.getAttribute('src') || '';
+          if (isAdHost(src)) { node.remove(); continue; }
+        }
+        // Checa scripts de anúncio
+        if (node.tagName === 'SCRIPT') {
+          const src = node.src || node.getAttribute('src') || '';
+          if (isAdHost(src)) { node.remove(); continue; }
+        }
+        // Limpa filhos
+        if (node.querySelectorAll) cleanAds(node);
+      }
+    }
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  // ── 7. BLOQUEIA redirecionamentos suspeitos ─────────────────
+  const _origAssign   = location.assign.bind(location);
+  const _origReplace  = location.replace.bind(location);
+  try {
+    Object.defineProperty(location, 'assign', {
+      value(url) { if (isAdHost(url)) { console.debug('[AdBlock] location.assign bloqueado:', url); return; } _origAssign(url); },
+      configurable: true,
+    });
+    Object.defineProperty(location, 'replace', {
+      value(url) { if (isAdHost(url)) { console.debug('[AdBlock] location.replace bloqueado:', url); return; } _origReplace(url); },
+      configurable: true,
+    });
+  } catch(e) {}
+
+  // Intercepta pushState/replaceState para evitar redirect silencioso
+  const _origPush    = history.pushState.bind(history);
+  const _origRepl    = history.replaceState.bind(history);
+  history.pushState = function(state, title, url) {
+    if (url && isAdHost(String(url))) { console.debug('[AdBlock] pushState bloqueado:', url); return; }
+    return _origPush(state, title, url);
+  };
+  history.replaceState = function(state, title, url) {
+    if (url && isAdHost(String(url))) { console.debug('[AdBlock] replaceState bloqueado:', url); return; }
+    return _origRepl(state, title, url);
+  };
+
+  // ── 8. BLOQUEIA overlays de clique (técnica comum de pop-under) ──
+  // Remove elementos transparentes de tamanho total colocados sobre o conteúdo
+  function removeClickOverlays() {
+    document.querySelectorAll('div,a').forEach(el => {
+      // Ignora elementos internos do app
+      if (el.closest('#navbar,#page-home,#page-search,#page-detail,#page-player,#page-admin,#page-profile,.modal-overlay,.mobile-nav,#loader')) return;
+      const style = window.getComputedStyle(el);
+      const rect  = el.getBoundingClientRect();
+      if (
+        style.position === 'fixed' &&
+        parseFloat(style.opacity) < 0.05 &&
+        rect.width > window.innerWidth * 0.8 &&
+        rect.height > window.innerHeight * 0.8
+      ) {
+        console.debug('[AdBlock] overlay de clique removido:', el);
+        el.remove();
+      }
+    });
+  }
+  setInterval(removeClickOverlays, 2000);
+
+  console.info('[RitiFlix AdBlock] ativo — bloqueando popups, redirects e redes de anúncios.');
+})();
+</script>
 </body>
 </html>
