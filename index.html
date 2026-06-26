@@ -110,6 +110,14 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .see-all:hover{color:var(--gold2)}
 /* CARDS */
 .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1.1rem}
+/* COLEÇÃO (página de detalhes) */
+.collection-section{padding:0 2rem;max-width:1600px;margin:0 auto;margin-bottom:1rem}
+.collection-row{display:flex;gap:1.1rem;overflow-x:auto;padding-bottom:.5rem;scroll-snap-type:x proximity}
+.collection-row::-webkit-scrollbar{height:6px}
+.collection-row::-webkit-scrollbar-thumb{background:var(--gold);border-radius:3px;opacity:.5}
+.collection-row .anime-card{flex:0 0 160px;scroll-snap-align:start}
+.collection-row .anime-card.is-current{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,168,76,0.5)}
+@media (max-width:768px){.collection-section{padding:0 1rem}.collection-row .anime-card{flex:0 0 130px}}
 .anime-card{background:var(--card);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .3s;position:relative;border:1px solid var(--border)}
 .anime-card:hover{transform:translateY(-7px) scale(1.02);border-color:rgba(201,168,76,0.35);box-shadow:0 20px 50px rgba(0,0,0,0.5),0 0 0 1px rgba(201,168,76,0.1)}
 .card-img{width:100%;aspect-ratio:2/3;object-fit:cover;background:var(--bg3);position:relative;overflow:hidden}
@@ -870,6 +878,12 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
     </div>
+  </div>
+  <div class="collection-section" id="collectionSection" style="display:none">
+    <div class="section-header" style="margin-bottom:1rem">
+      <div class="section-title">Coleção</div>
+    </div>
+    <div class="collection-row" id="collectionRow"></div>
   </div>
   <div class="episodes-section" id="episodesSection">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
@@ -2059,6 +2073,23 @@ async function renderDetail(id) {
   if (seasonSel) seasonSel.style.display = movie ? 'none' : '';
   if (epTitle) epTitle.textContent = movie ? 'Filme' : 'Episódios';
   renderEpisodes();
+  renderCollection(anime);
+}
+
+// Mostra outros títulos da mesma coleção/franquia (ex: Venom, Venom 2, Venom 3...)
+async function renderCollection(anime) {
+  const section = document.getElementById('collectionSection');
+  const row = document.getElementById('collectionRow');
+  if (!section || !row) return;
+  const collectionName = (anime.collection || '').trim();
+  if (!collectionName) { section.style.display = 'none'; row.innerHTML = ''; return; }
+  const { data: items } = await sb.from('animes').select('*').eq('collection', collectionName).order('year', { ascending: true });
+  if (!items || items.length < 2) { section.style.display = 'none'; row.innerHTML = ''; return; }
+  section.style.display = '';
+  row.innerHTML = items.map(a => {
+    const html = animeCardHTML(a);
+    return a.id === anime.id ? html.replace('class="anime-card"', 'class="anime-card is-current"') : html;
+  }).join('');
 }
 
 async function renderEpisodes(forceSeason) {
@@ -3051,6 +3082,11 @@ async function adminEditAnime(id) {
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="eGenres" value="${anime.genres.filter(g=>g!=='Filme'&&g!=='Série').join(', ')}"></div>
       <div class="form-group">
+        <label class="form-label">Coleção <span style="color:var(--text3);font-weight:400;font-size:.7rem">(opcional — agrupa filmes/séries da mesma franquia)</span></label>
+        <input class="form-input" id="eCollection" value="${sanitize(anime.collection||'')}" placeholder="Ex: Venom">
+        <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Use o mesmo nome em todos os títulos da franquia (ex: "Venom" em Venom, Venom 2 e Venom 3) para que apareçam juntos na seção Coleção.</div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Visibilidade na Home</label>
         <div class="toggle-chips">
           <label class="toggle-chip"><input type="checkbox" id="eFeatured"${anime.featured?' checked':''}><span><span class="tc-dot"></span>⭐ Em destaque</span></label>
@@ -3086,6 +3122,7 @@ async function saveEditAnime(id) {
     year: parseInt(document.getElementById('eYear').value) || 2020,
     score: parseFloat(document.getElementById('eScore').value) || 0,
     genres: document.getElementById('eGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
+    collection: document.getElementById('eCollection')?.value?.trim() ? sanitize(document.getElementById('eCollection').value.trim()) : null,
     featured: document.getElementById('eFeatured').checked,
     is_new: document.getElementById('eNew').checked,
     popular: document.getElementById('ePopular').checked,
@@ -3136,6 +3173,11 @@ function renderAdminAddAnime(el) {
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="aGenres" placeholder="Ação, Aventura"></div>
       <div class="form-group">
+        <label class="form-label">Coleção <span style="color:var(--text3);font-weight:400;font-size:.7rem">(opcional — agrupa filmes/séries da mesma franquia)</span></label>
+        <input class="form-input" id="aCollection" placeholder="Ex: Venom">
+        <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Use o mesmo nome em todos os títulos da franquia (ex: "Venom" em Venom, Venom 2 e Venom 3) para que apareçam juntos na seção Coleção.</div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Visibilidade na Home</label>
         <div class="toggle-chips">
           <label class="toggle-chip"><input type="checkbox" id="aFeatured"><span><span class="tc-dot"></span>⭐ Em destaque</span></label>
@@ -3169,6 +3211,7 @@ async function saveNewAnime() {
     poster: posterUrl,
     banner_url: bannerUrl || null,
     genres: document.getElementById('aGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
+    collection: document.getElementById('aCollection')?.value?.trim() ? sanitize(document.getElementById('aCollection').value.trim()) : null,
     status: document.getElementById('aStatus').value,
     episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('aEps').value) || 1),
     year: parseInt(document.getElementById('aYear').value) || 2024,
