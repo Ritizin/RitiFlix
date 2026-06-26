@@ -4169,10 +4169,10 @@ async function doodHandleRemoteUpload(targetInputId) {
       // Busca URL embed via fileinfo
       const info = await doodFileInfo(fileCode);
       clearInterval(poll);
-      const embedUrl = info?.protected_embed || info?.embed_url || \`https://playmogo.com/e/\${fileCode}\`;
+      const embedUrl = info?.protected_embed || info?.embed_url || `https://playmogo.com/e/${fileCode}`;
       const inputEl = document.getElementById(targetInputId);
       if (inputEl) { inputEl.value = embedUrl; inputEl.dispatchEvent(new Event('input')); }
-      if (statusEl) statusEl.innerHTML = \`<span style="color:#4ade80">✅ Pronto! URL embed preenchida: <code style="font-size:.75rem">\${embedUrl}</code></span>\`;
+      if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80">✅ Pronto! URL embed preenchida: <code style="font-size:.75rem">${embedUrl}</code></span>`;
       showNotif('✅ Doodstream: upload concluído! URL embed preenchida.', 'success');
     } else if (failed) {
       clearInterval(poll);
@@ -4180,7 +4180,7 @@ async function doodHandleRemoteUpload(targetInputId) {
       showNotif('❌ Doodstream: falha no upload remoto.', 'error');
     } else {
       const pct = (s && s.bytes_total > 0) ? Math.round(s.bytes_downloaded / s.bytes_total * 100) + '%' : '...';
-      if (statusEl) statusEl.innerHTML = \`⏳ Processando... \${pct}\`;
+      if (statusEl) statusEl.innerHTML = `⏳ Processando... ${pct}`;
     }
     if (tries >= 40) { clearInterval(poll); if (statusEl) statusEl.innerHTML = '⚠️ Tempo esgotado. Verifique no painel do Doodstream.'; }
   }, 8000);
@@ -4189,11 +4189,11 @@ async function doodHandleRemoteUpload(targetInputId) {
 async function testDoodstreamConnection() {
   showNotif('⏳ Testando conexão com o Doodstream...', 'success');
   try {
-    const res = await fetch(\`\${DOODSTREAM_API_BASE}/account/info?key=\${DOODSTREAM_API_KEY}\`);
+    const res = await fetch(`${DOODSTREAM_API_BASE}/account/info?key=${DOODSTREAM_API_KEY}`);
     const data = await res.json();
     if (data.status === 200 && data.result) {
       const r = data.result;
-      showNotif(\`✅ Doodstream conectado! Conta: \${r.email || ''} — Armazenamento: \${r.storage_used || '?'}\`, 'success');
+      showNotif(`✅ Doodstream conectado! Conta: ${r.email || ''} — Armazenamento: ${r.storage_used || '?'}`, 'success');
     } else {
       showNotif('❌ Doodstream: API Key inválida ou erro na resposta.', 'error');
     }
