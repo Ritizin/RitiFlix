@@ -2845,6 +2845,8 @@ function adminNav(section, el, extraId, extraId2) {
     animes: renderAdminAnimes,
     addAnime: renderAdminAddAnime,
     editAnime: (el) => adminEditAnime(extraId),
+    addCollection: renderAdminAddCollection,
+    editCollection: (el) => renderAdminEditCollection(el, extraId),
     seasons: (el) => renderAdminSeasons(el, extraId),
     movieVideo: (el) => renderAdminMovieVideo(el, extraId),
     episodes: (el) => renderAdminEpisodes(el, extraId, extraId2),
@@ -2968,65 +2970,30 @@ async function renderAdminDashboard(el) {
 
 let adminAnimeFilter = 'Todos';
 let adminAnimeSearch = '';
-function setAdminAnimeSearch(v) {
-  adminAnimeSearch = v;
-  renderAdminAnimes(document.getElementById('adminContent'));
-  const input = document.getElementById('adminAnimeSearchInput');
-  if (input) { input.focus(); const len = input.value.length; input.setSelectionRange(len, len); }
-}
+let _adminAnimesCache = [];
+let _adminAnimeSearchTimer = null;
 function isAnimeMovie(a) { return a.type === 'filme' || (!a.type && (a.genres||[]).includes('Filme')); }
+function isAnimeAnimacao(a) { return (a.genres||[]).includes('Animação'); }
 
-async function renderAdminAnimes(el) {
-  const allAnimes = await getAnimes();
-  const totalMovies = allAnimes.filter(isAnimeMovie).length;
-  const totalSeries = allAnimes.length - totalMovies;
-  const totalPopular = allAnimes.filter(a => a.popular).length;
-  const totalTrending = allAnimes.filter(a => a.trending).length;
-  const totalRecommended = allAnimes.filter(a => a.recommended).length;
-  let animes = allAnimes;
-  if (adminAnimeFilter === 'Séries') animes = allAnimes.filter(a => !isAnimeMovie(a));
-  else if (adminAnimeFilter === 'Filmes') animes = allAnimes.filter(isAnimeMovie);
-  else if (adminAnimeFilter === 'Populares') animes = allAnimes.filter(a => a.popular);
-  else if (adminAnimeFilter === 'EmAlta') animes = allAnimes.filter(a => a.trending);
-  else if (adminAnimeFilter === 'Recomendados') animes = allAnimes.filter(a => a.recommended);
-  if (adminAnimeSearch && adminAnimeSearch.trim()) {
-    const q = adminAnimeSearch.trim().toLowerCase();
-    animes = animes.filter(a => (a.title || '').toLowerCase().includes(q));
-  }
-  const tabs = [
-    { key: 'Todos', label: `Todos (${allAnimes.length})` },
-    { key: 'Séries', label: `📺 Séries (${totalSeries})` },
-    { key: 'Filmes', label: `🎬 Filmes (${totalMovies})` },
-    { key: 'Populares', label: `🔥 Populares (${totalPopular})` },
-    { key: 'EmAlta', label: `📈 Em Alta (${totalTrending})` },
-    { key: 'Recomendados', label: `🍿 Séries e Filmes (${totalRecommended})` },
-  ];
-  el.innerHTML = `
-  <div class="admin-header-bar" style="position:relative">
-    <div class="admin-page-title">🎬 Títulos</div>
-    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,40%)">
-      <div class="search-wrap" style="width:100%">
-        <input class="form-input" id="adminAnimeSearchInput" value="${sanitize(adminAnimeSearch||'')}" placeholder="🔍 Buscar filme, série ou animação..." oninput="setAdminAnimeSearch(this.value)" autocomplete="off" style="width:100%">
-      </div>
-    </div>
-    <button class="btn btn-red" onclick="adminNav('addAnime',null)">+ Adicionar Título</button>
-  </div>
-  <div style="display:flex;gap:.6rem;margin-bottom:1.25rem;flex-wrap:wrap">
-    ${tabs.map(t => `<button class="filter-btn${adminAnimeFilter===t.key?' active':''}" onclick="adminAnimeFilter='${t.key}';adminNav('animes',null)">${t.label}</button>`).join('')}
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
-    ${animes.length === 0 ? `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text3)">Nenhum título nesta categoria ainda.</div>` : animes.map(a => {
-    const movie = isAnimeMovie(a);
-    return `
+function debouncedAdminAnimeSearch(v) {
+  clearTimeout(_adminAnimeSearchTimer);
+  _adminAnimeSearchTimer = setTimeout(() => { adminAnimeSearch = v; updateAdminAnimesGrid(); }, 200);
+}
+function setAdminAnimeFilter(key) {
+  adminAnimeFilter = key;
+  adminAnimeSearch = '';
+  renderAdminAnimes(document.getElementById('adminContent'));
+}
+function animeCardHTML(a) {
+  const movie = isAnimeMovie(a);
+  return `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='rgba(229,9,20,0.5)'" onmouseout="this.style.borderColor='var(--border)'">
       <div style="aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:3rem;position:relative;overflow:hidden">
         ${a.poster ? `<img src="${a.poster}" style="width:100%;height:100%;object-fit:cover">` : `<span style="opacity:.5">${a.emoji}</span>`}
         <span style="position:absolute;top:.4rem;left:.4rem;background:rgba(7,9,15,0.85);color:${movie?'var(--gold2)':'#7dd3fc'};font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px;letter-spacing:.04em">${movie?'🎬 FILME':'📺 SÉRIE'}</span>
         <div style="position:absolute;top:.4rem;right:.4rem;display:flex;flex-direction:column;gap:.25rem;align-items:flex-end">
           ${a.featured ? '<span style="background:var(--grad);color:#07090f;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">⭐ DESTAQUE</span>' : ''}
-          ${a.popular ? '<span style="background:rgba(201,168,76,0.85);color:#07090f;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">🔥 POPULAR</span>' : ''}
-          ${a.trending ? '<span style="background:rgba(59,130,246,0.85);color:#fff;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">📈 EM ALTA</span>' : ''}
-          ${a.recommended ? '<span style="background:rgba(180,120,255,0.85);color:#fff;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">🍿 SÉRIES E FILMES</span>' : ''}
+          ${isAnimeAnimacao(a) ? '<span style="background:rgba(180,120,255,0.85);color:#fff;font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px">✨ ANIMAÇÃO</span>' : ''}
         </div>
       </div>
       <div style="padding:.75rem">
@@ -3038,8 +3005,94 @@ async function renderAdminAnimes(el) {
           <button class="td-btn td-del" onclick="event.stopPropagation();adminDeleteAnime(${a.id})" style="padding:.4rem .6rem;font-size:.75rem">🗑️</button>
         </div>
       </div>
-    </div>`;}).join('')}
+    </div>`;
+}
+function animesGridHTML(animes) {
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
+    ${animes.length === 0 ? `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text3)">Nenhum título nesta categoria ainda.</div>` : animes.map(animeCardHTML).join('')}
   </div>`;
+}
+function collectionCardHTML(name, items) {
+  const cover = items.find(i => i.poster)?.poster || '';
+  return `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='rgba(229,9,20,0.5)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:3rem;position:relative;overflow:hidden">
+        ${cover ? `<img src="${cover}" style="width:100%;height:100%;object-fit:cover;opacity:.85">` : `<span style="opacity:.5">📁</span>`}
+        <span style="position:absolute;top:.4rem;left:.4rem;background:rgba(7,9,15,0.85);color:var(--gold2);font-size:.6rem;font-weight:700;padding:.2rem .5rem;border-radius:4px;letter-spacing:.04em">📁 COLEÇÃO</span>
+      </div>
+      <div style="padding:.75rem">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(name)}</div>
+        <div style="font-size:.75rem;color:var(--text3);margin-bottom:.75rem">${items.length} título(s)</div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-red" style="flex:1;font-size:.75rem;padding:.4rem" onclick="adminNav('editCollection',null,'${sanitize(name).replace(/'/g, "\\'")}')">✏️ Editar</button>
+          <button class="td-btn td-del" onclick="event.stopPropagation();adminDeleteCollection('${sanitize(name).replace(/'/g, "\\'")}')" style="padding:.4rem .6rem;font-size:.75rem">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+}
+function collectionsGridHTML(allAnimes) {
+  const byName = {};
+  allAnimes.forEach(a => { if (a.collection) { (byName[a.collection] = byName[a.collection] || []).push(a); } });
+  const names = Object.keys(byName).sort();
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
+    ${names.length === 0 ? `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text3)">Nenhuma coleção criada ainda.</div>` : names.map(name => collectionCardHTML(name, byName[name])).join('')}
+  </div>`;
+}
+function updateAdminAnimesGrid() {
+  const gridEl = document.getElementById('adminAnimesGrid');
+  if (!gridEl) return;
+  let animes = _adminAnimesCache;
+  if (adminAnimeFilter === 'Séries') animes = animes.filter(a => !isAnimeMovie(a));
+  else if (adminAnimeFilter === 'Filmes') animes = animes.filter(isAnimeMovie);
+  else if (adminAnimeFilter === 'Animação') animes = animes.filter(isAnimeAnimacao);
+  if (adminAnimeSearch && adminAnimeSearch.trim()) {
+    const q = adminAnimeSearch.trim().toLowerCase();
+    animes = animes.filter(a => (a.title || '').toLowerCase().includes(q));
+  }
+  gridEl.innerHTML = animesGridHTML(animes);
+}
+
+async function renderAdminAnimes(el) {
+  const allAnimes = await getAnimes();
+  _adminAnimesCache = allAnimes;
+  const totalMovies = allAnimes.filter(isAnimeMovie).length;
+  const totalSeries = allAnimes.length - totalMovies;
+  const totalAnimacao = allAnimes.filter(isAnimeAnimacao).length;
+  const totalCollections = new Set(allAnimes.map(a => a.collection).filter(Boolean)).size;
+  const isColecao = adminAnimeFilter === 'Colecao';
+  const tabs = [
+    { key: 'Todos', label: `Todos (${allAnimes.length})` },
+    { key: 'Séries', label: `📺 Séries (${totalSeries})` },
+    { key: 'Filmes', label: `🎬 Filmes (${totalMovies})` },
+    { key: 'Animação', label: `✨ Animação (${totalAnimacao})` },
+    { key: 'Colecao', label: `📁 Coleção (${totalCollections})` },
+  ];
+  let animes = allAnimes;
+  if (adminAnimeFilter === 'Séries') animes = allAnimes.filter(a => !isAnimeMovie(a));
+  else if (adminAnimeFilter === 'Filmes') animes = allAnimes.filter(isAnimeMovie);
+  else if (adminAnimeFilter === 'Animação') animes = allAnimes.filter(isAnimeAnimacao);
+  el.innerHTML = `
+  <div class="admin-header-bar" style="position:relative">
+    <div class="admin-page-title">🎬 Títulos</div>
+    ${!isColecao ? `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,40%)">
+      <div class="search-wrap" style="width:100%">
+        <input class="form-input" id="adminAnimeSearchInput" value="${sanitize(adminAnimeSearch||'')}" placeholder="🔍 Buscar filme, série ou animação..." oninput="debouncedAdminAnimeSearch(this.value)" autocomplete="off" style="width:100%">
+      </div>
+    </div>` : ''}
+    <button class="btn btn-red" onclick="${isColecao ? "adminNav('addCollection',null)" : "adminNav('addAnime',null)"}">${isColecao ? '+ Criar Coleção' : '+ Adicionar Título'}</button>
+  </div>
+  <div style="display:flex;gap:.6rem;margin-bottom:1.25rem;flex-wrap:wrap">
+    ${tabs.map(t => `<button class="filter-btn${adminAnimeFilter===t.key?' active':''}" onclick="setAdminAnimeFilter('${t.key}')">${t.label}</button>`).join('')}
+  </div>
+  <div id="adminAnimesGrid">${isColecao ? collectionsGridHTML(allAnimes) : animesGridHTML(animes)}</div>`;
+}
+
+async function adminDeleteCollection(name) {
+  if (!confirm(`Excluir a coleção "${name}"? Os títulos não serão excluídos, apenas desvinculados da coleção.`)) return;
+  await sb.from('animes').update({ collection: null }).eq('collection', name);
+  showNotif('🗑️ Coleção excluída.', 'success');
+  adminAnimeFilter = 'Colecao';
+  adminNav('animes', null);
 }
 
 async function adminDeleteAnime(id) {
@@ -3098,12 +3151,6 @@ async function adminEditAnime(id) {
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="eGenres" value="${anime.genres.filter(g=>g!=='Filme'&&g!=='Série').join(', ')}"></div>
       <div class="form-group">
-        <label class="form-label">Coleção <span style="color:var(--text3);font-weight:400;font-size:.7rem">(opcional — agrupa filmes/séries da mesma franquia)</span></label>
-        <input class="form-input" id="eCollection" value="${sanitize(anime.collection||'')}" placeholder="Ex: Venom" oninput="searchCollectionSuggestions(this.value,'e')" autocomplete="off">
-        <div id="eCollectionResults" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;margin-top:.35rem;display:none"></div>
-        <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Use o mesmo nome em todos os títulos da franquia (ex: "Venom" em Venom, Venom 2 e Venom 3) para que apareçam juntos na seção Coleção.</div>
-      </div>
-      <div class="form-group">
         <label class="form-label">Visibilidade na Home</label>
         <div class="toggle-chips">
           <label class="toggle-chip"><input type="checkbox" id="eFeatured"${anime.featured?' checked':''}><span><span class="tc-dot"></span>⭐ Em destaque</span></label>
@@ -3139,7 +3186,6 @@ async function saveEditAnime(id) {
     year: parseInt(document.getElementById('eYear').value) || 2020,
     score: parseFloat(document.getElementById('eScore').value) || 0,
     genres: document.getElementById('eGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
-    collection: document.getElementById('eCollection')?.value?.trim() ? sanitize(document.getElementById('eCollection').value.trim()) : null,
     featured: document.getElementById('eFeatured').checked,
     is_new: document.getElementById('eNew').checked,
     popular: document.getElementById('ePopular').checked,
@@ -3190,12 +3236,6 @@ function renderAdminAddAnime(el) {
       </div>
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="aGenres" placeholder="Ação, Aventura"></div>
       <div class="form-group">
-        <label class="form-label">Coleção <span style="color:var(--text3);font-weight:400;font-size:.7rem">(opcional — agrupa filmes/séries da mesma franquia)</span></label>
-        <input class="form-input" id="aCollection" placeholder="Ex: Venom" oninput="searchCollectionSuggestions(this.value,'a')" autocomplete="off">
-        <div id="aCollectionResults" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;margin-top:.35rem;display:none"></div>
-        <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Use o mesmo nome em todos os títulos da franquia (ex: "Venom" em Venom, Venom 2 e Venom 3) para que apareçam juntos na seção Coleção.</div>
-      </div>
-      <div class="form-group">
         <label class="form-label">Visibilidade na Home</label>
         <div class="toggle-chips">
           <label class="toggle-chip"><input type="checkbox" id="aFeatured"><span><span class="tc-dot"></span>⭐ Em destaque</span></label>
@@ -3229,7 +3269,6 @@ async function saveNewAnime() {
     poster: posterUrl,
     banner_url: bannerUrl || null,
     genres: document.getElementById('aGenres').value.split(',').map(g=>g.trim()).filter(Boolean),
-    collection: document.getElementById('aCollection')?.value?.trim() ? sanitize(document.getElementById('aCollection').value.trim()) : null,
     status: document.getElementById('aStatus').value,
     episodes: type === 'filme' ? 1 : (parseInt(document.getElementById('aEps').value) || 1),
     year: parseInt(document.getElementById('aYear').value) || 2024,
@@ -3666,39 +3705,119 @@ async function preloadBannerAnimeName(animeId) {
 }
 
 // ============================================================
-// COLEÇÃO — autocomplete com base nas coleções já existentes
+// COLEÇÃO — criar/editar coleções (agrupar filmes/séries/animações)
 // ============================================================
-let _collectionSearchTimer = null;
-async function searchCollectionSuggestions(q, prefix) {
-  const results = document.getElementById(prefix + 'CollectionResults');
+let _collectionDraftItems = [];
+let _collectionOriginalIds = [];
+let _collectionEditingOriginalName = null;
+let _collectionItemSearchTimer = null;
+
+function collectionFormHTML(name, isEdit) {
+  return `
+  <div class="admin-header-bar">
+    <div class="admin-page-title">${isEdit ? '✏️ Editar Coleção' : '📁 Criar Coleção'}</div>
+    <button class="btn btn-ghost" onclick="adminAnimeFilter='Colecao';adminNav('animes',null)">← Títulos</button>
+  </div>
+  <div class="admin-form">
+    <div class="admin-section-card">
+      <div class="admin-section-title">Dados da coleção</div>
+      <div class="form-group">
+        <label class="form-label">Nome da coleção *</label>
+        <input class="form-input" id="collectionNameInput" value="${sanitize(name || '')}" placeholder="Ex: Venom">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adicionar Filme / Série / Animação</label>
+        <input class="form-input" id="collectionItemSearch" placeholder="Digite o nome do filme, série ou animação..." oninput="searchCollectionItem(this.value)" autocomplete="off">
+        <div id="collectionItemResults" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;margin-top:.35rem;display:none"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Títulos na coleção</label>
+        <div id="collectionDraftList" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.25rem"></div>
+      </div>
+      <button class="btn btn-red" onclick="saveCollectionForm()">💾 Salvar Coleção</button>
+    </div>
+  </div>`;
+}
+
+function renderAdminAddCollection(el) {
+  _collectionDraftItems = [];
+  _collectionOriginalIds = [];
+  _collectionEditingOriginalName = null;
+  el.innerHTML = collectionFormHTML('', false);
+  renderCollectionDraftList();
+}
+
+async function renderAdminEditCollection(el, name) {
+  const { data: items } = await sb.from('animes').select('id,title,emoji,poster').eq('collection', name).order('year', { ascending: true });
+  _collectionDraftItems = (items || []).map(i => ({ id: i.id, title: i.title, emoji: i.emoji }));
+  _collectionOriginalIds = _collectionDraftItems.map(i => i.id);
+  _collectionEditingOriginalName = name;
+  el.innerHTML = collectionFormHTML(name, true);
+  renderCollectionDraftList();
+}
+
+function renderCollectionDraftList() {
+  const list = document.getElementById('collectionDraftList');
+  if (!list) return;
+  if (_collectionDraftItems.length === 0) {
+    list.innerHTML = `<div style="font-size:.8rem;color:var(--text3);padding:.5rem 0">Nenhum título adicionado ainda. Use a busca acima.</div>`;
+    return;
+  }
+  list.innerHTML = _collectionDraftItems.map(i => `
+    <div style="display:flex;align-items:center;gap:.6rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.55rem .8rem">
+      <span style="font-size:1.1rem">${i.emoji || '🎬'}</span>
+      <span style="flex:1;font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(i.title)}</span>
+      <button class="td-btn td-del" style="padding:.3rem .55rem;font-size:.75rem" onclick="removeCollectionDraftItem(${i.id})">🗑️</button>
+    </div>`).join('');
+}
+
+async function searchCollectionItem(q) {
+  const results = document.getElementById('collectionItemResults');
   if (!results) return;
-  clearTimeout(_collectionSearchTimer);
-  if (!q || q.trim().length < 1) { results.style.display = 'none'; return; }
-  _collectionSearchTimer = setTimeout(async () => {
-    const { data } = await sb.from('animes').select('collection').not('collection', 'is', null).ilike('collection', '%' + q.trim() + '%').limit(50);
-    const unique = [...new Set((data || []).map(d => d.collection).filter(Boolean))].slice(0, 8);
-    if (unique.length === 0) { results.style.display = 'none'; return; }
-    results.innerHTML = unique.map(name => `<div onclick="selectCollectionSuggestion('${prefix}', '${sanitize(name).replace(/'/g, "\\'")}')"
+  clearTimeout(_collectionItemSearchTimer);
+  if (!q || q.trim().length < 2) { results.style.display = 'none'; return; }
+  _collectionItemSearchTimer = setTimeout(async () => {
+    const { data } = await sb.from('animes').select('id,title,emoji').ilike('title', '%' + q.trim() + '%').limit(8);
+    if (!data || data.length === 0) { results.innerHTML = '<div style="padding:.75rem 1rem;font-size:.8rem;color:var(--text3)">Nenhum título encontrado.</div>'; results.style.display = 'block'; return; }
+    results.innerHTML = data.map(a => `<div onclick="addCollectionDraftItem(${a.id},'${sanitize(a.title).replace(/'/g, "\\'")}','${(a.emoji||'🎬').replace(/'/g,'')}')"
       style="padding:.6rem 1rem;font-size:.85rem;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:.5rem"
       onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <span>📁</span><span style="font-weight:600">${sanitize(name)}</span>
+      <span>${a.emoji||'🎬'}</span><span style="font-weight:600">${sanitize(a.title)}</span>
     </div>`).join('');
     results.style.display = 'block';
-  }, 250);
+  }, 280);
 }
-function selectCollectionSuggestion(prefix, name) {
-  const input = document.getElementById(prefix + 'Collection');
-  const results = document.getElementById(prefix + 'CollectionResults');
-  if (input) input.value = name;
+function addCollectionDraftItem(id, title, emoji) {
+  if (!_collectionDraftItems.find(i => i.id === id)) _collectionDraftItems.push({ id, title, emoji });
+  renderCollectionDraftList();
+  const search = document.getElementById('collectionItemSearch');
+  const results = document.getElementById('collectionItemResults');
+  if (search) search.value = '';
   if (results) results.style.display = 'none';
 }
+function removeCollectionDraftItem(id) {
+  _collectionDraftItems = _collectionDraftItems.filter(i => i.id !== id);
+  renderCollectionDraftList();
+}
 document.addEventListener('click', (e) => {
-  ['aCollectionResults', 'eCollectionResults'].forEach(id => {
-    const el = document.getElementById(id);
-    const input = document.getElementById(id.replace('Results', ''));
-    if (el && el.style.display !== 'none' && e.target !== input && !el.contains(e.target)) el.style.display = 'none';
-  });
+  const results = document.getElementById('collectionItemResults');
+  const input = document.getElementById('collectionItemSearch');
+  if (results && results.style.display !== 'none' && e.target !== input && !results.contains(e.target)) results.style.display = 'none';
 });
+
+async function saveCollectionForm() {
+  const nameInput = document.getElementById('collectionNameInput');
+  const name = nameInput.value.trim();
+  if (!name) { showNotif('❌ Dê um nome para a coleção.', 'error'); return; }
+  if (_collectionDraftItems.length === 0) { showNotif('❌ Adicione pelo menos um título à coleção.', 'error'); return; }
+  const newIds = _collectionDraftItems.map(i => i.id);
+  const removedIds = _collectionOriginalIds.filter(id => !newIds.includes(id));
+  if (removedIds.length) await sb.from('animes').update({ collection: null }).in('id', removedIds);
+  await sb.from('animes').update({ collection: sanitize(name) }).in('id', newIds);
+  showNotif('✅ Coleção salva!', 'success');
+  adminAnimeFilter = 'Colecao';
+  adminNav('animes', null);
+}
 
 // ============================================================
 // TMDB — busca no formulário de Banner (Hero)
