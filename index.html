@@ -2346,9 +2346,15 @@ function loadVideoUrl(videoUrl, resumePct) {
     <div class="iframe-player-wrap" id="iframePlayerWrap">
       <iframe id="iframeVideo" src="${safeUrl}"
         allowfullscreen
-        allow="autoplay; fullscreen; encrypted-media"
-        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"></iframe>
+        allow="autoplay; fullscreen; encrypted-media"></iframe>
     </div>`;
+
+  // Proteção: trava tentativas de window.open vindas da página principal
+  // (anúncios/scripts do player que conseguirem acessar o contexto pai
+  // não conseguem abrir abas/popups novos). Não bloqueia popups abertos
+  // pelo próprio iframe em seu contexto interno — sem sandbox, isso
+  // depende do bloqueador de pop-up nativo do navegador.
+  window.open = function() { return null; };
 }
 
 function _wireRealPlayer(video, resumePct) {
