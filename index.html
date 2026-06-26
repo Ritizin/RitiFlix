@@ -2967,6 +2967,13 @@ async function renderAdminDashboard(el) {
 }
 
 let adminAnimeFilter = 'Todos';
+let adminAnimeSearch = '';
+function setAdminAnimeSearch(v) {
+  adminAnimeSearch = v;
+  renderAdminAnimes(document.getElementById('adminContent'));
+  const input = document.getElementById('adminAnimeSearchInput');
+  if (input) { input.focus(); const len = input.value.length; input.setSelectionRange(len, len); }
+}
 function isAnimeMovie(a) { return a.type === 'filme' || (!a.type && (a.genres||[]).includes('Filme')); }
 
 async function renderAdminAnimes(el) {
@@ -2982,6 +2989,10 @@ async function renderAdminAnimes(el) {
   else if (adminAnimeFilter === 'Populares') animes = allAnimes.filter(a => a.popular);
   else if (adminAnimeFilter === 'EmAlta') animes = allAnimes.filter(a => a.trending);
   else if (adminAnimeFilter === 'Recomendados') animes = allAnimes.filter(a => a.recommended);
+  if (adminAnimeSearch && adminAnimeSearch.trim()) {
+    const q = adminAnimeSearch.trim().toLowerCase();
+    animes = animes.filter(a => (a.title || '').toLowerCase().includes(q));
+  }
   const tabs = [
     { key: 'Todos', label: `Todos (${allAnimes.length})` },
     { key: 'Séries', label: `📺 Séries (${totalSeries})` },
@@ -2991,8 +3002,13 @@ async function renderAdminAnimes(el) {
     { key: 'Recomendados', label: `🍿 Séries e Filmes (${totalRecommended})` },
   ];
   el.innerHTML = `
-  <div class="admin-header-bar">
+  <div class="admin-header-bar" style="position:relative">
     <div class="admin-page-title">🎬 Títulos</div>
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,40%)">
+      <div class="search-wrap" style="width:100%">
+        <input class="form-input" id="adminAnimeSearchInput" value="${sanitize(adminAnimeSearch||'')}" placeholder="🔍 Buscar filme, série ou animação..." oninput="setAdminAnimeSearch(this.value)" autocomplete="off" style="width:100%">
+      </div>
+    </div>
     <button class="btn btn-red" onclick="adminNav('addAnime',null)">+ Adicionar Título</button>
   </div>
   <div style="display:flex;gap:.6rem;margin-bottom:1.25rem;flex-wrap:wrap">
@@ -3083,7 +3099,8 @@ async function adminEditAnime(id) {
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="eGenres" value="${anime.genres.filter(g=>g!=='Filme'&&g!=='Série').join(', ')}"></div>
       <div class="form-group">
         <label class="form-label">Coleção <span style="color:var(--text3);font-weight:400;font-size:.7rem">(opcional — agrupa filmes/séries da mesma franquia)</span></label>
-        <input class="form-input" id="eCollection" value="${sanitize(anime.collection||'')}" placeholder="Ex: Venom">
+        <input class="form-input" id="eCollection" value="${sanitize(anime.collection||'')}" placeholder="Ex: Venom" oninput="searchCollectionSuggestions(this.value,'e')" autocomplete="off">
+        <div id="eCollectionResults" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;margin-top:.35rem;display:none"></div>
         <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Use o mesmo nome em todos os títulos da franquia (ex: "Venom" em Venom, Venom 2 e Venom 3) para que apareçam juntos na seção Coleção.</div>
       </div>
       <div class="form-group">
@@ -3174,7 +3191,8 @@ function renderAdminAddAnime(el) {
       <div class="form-group"><label class="form-label">Gêneros (separados por vírgula)</label><input class="form-input" id="aGenres" placeholder="Ação, Aventura"></div>
       <div class="form-group">
         <label class="form-label">Coleção <span style="color:var(--text3);font-weight:400;font-size:.7rem">(opcional — agrupa filmes/séries da mesma franquia)</span></label>
-        <input class="form-input" id="aCollection" placeholder="Ex: Venom">
+        <input class="form-input" id="aCollection" placeholder="Ex: Venom" oninput="searchCollectionSuggestions(this.value,'a')" autocomplete="off">
+        <div id="aCollectionResults" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;margin-top:.35rem;display:none"></div>
         <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Use o mesmo nome em todos os títulos da franquia (ex: "Venom" em Venom, Venom 2 e Venom 3) para que apareçam juntos na seção Coleção.</div>
       </div>
       <div class="form-group">
@@ -3646,6 +3664,41 @@ async function preloadBannerAnimeName(animeId) {
     if (data) selectBannerAnime(data.id, (data.emoji||'🎬') + ' ' + data.title);
   } catch(e) {}
 }
+
+// ============================================================
+// COLEÇÃO — autocomplete com base nas coleções já existentes
+// ============================================================
+let _collectionSearchTimer = null;
+async function searchCollectionSuggestions(q, prefix) {
+  const results = document.getElementById(prefix + 'CollectionResults');
+  if (!results) return;
+  clearTimeout(_collectionSearchTimer);
+  if (!q || q.trim().length < 1) { results.style.display = 'none'; return; }
+  _collectionSearchTimer = setTimeout(async () => {
+    const { data } = await sb.from('animes').select('collection').not('collection', 'is', null).ilike('collection', '%' + q.trim() + '%').limit(50);
+    const unique = [...new Set((data || []).map(d => d.collection).filter(Boolean))].slice(0, 8);
+    if (unique.length === 0) { results.style.display = 'none'; return; }
+    results.innerHTML = unique.map(name => `<div onclick="selectCollectionSuggestion('${prefix}', '${sanitize(name).replace(/'/g, "\\'")}')"
+      style="padding:.6rem 1rem;font-size:.85rem;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:.5rem"
+      onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
+      <span>📁</span><span style="font-weight:600">${sanitize(name)}</span>
+    </div>`).join('');
+    results.style.display = 'block';
+  }, 250);
+}
+function selectCollectionSuggestion(prefix, name) {
+  const input = document.getElementById(prefix + 'Collection');
+  const results = document.getElementById(prefix + 'CollectionResults');
+  if (input) input.value = name;
+  if (results) results.style.display = 'none';
+}
+document.addEventListener('click', (e) => {
+  ['aCollectionResults', 'eCollectionResults'].forEach(id => {
+    const el = document.getElementById(id);
+    const input = document.getElementById(id.replace('Results', ''));
+    if (el && el.style.display !== 'none' && e.target !== input && !el.contains(e.target)) el.style.display = 'none';
+  });
+});
 
 // ============================================================
 // TMDB — busca no formulário de Banner (Hero)
