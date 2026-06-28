@@ -4563,22 +4563,57 @@ window.DoodStreamAPI={
 
 <script>
 // ============================================================
-// RITITFLIX — ADBLOCK NATIVO
+// RITIFLIX — ADBLOCK NATIVO v2
 // Bloqueia popups, overlays, redirects e requisições a redes
 // de anúncios sem depender de extensão externa.
+// ⚠️ NÃO usa sandbox nos iframes — não interfere com o player.
 // ============================================================
 (function() {
   'use strict';
 
+  // ── WHITELIST: domínios do player que NUNCA devem ser bloqueados ──
+  const PLAYER_WHITELIST = [
+    'superflixapi.rest','superflixapi.cyou',
+    'playmogo.com',
+    'dood.to','dood.la','dood.so','doodstream.com','doodapi.co',
+    'cloudflare.com','challenges.cloudflare.com',
+    'supabase.co','themoviedb.org','tmdb.org','image.tmdb.org',
+    'fonts.googleapis.com','fonts.gstatic.com','cdn.jsdelivr.net',
+  ];
+  const PLAYER_SET = new Set(PLAYER_WHITELIST);
+
+  function isWhitelisted(url) {
+    try {
+      const host = new URL(url, location.href).hostname.toLowerCase();
+      if (PLAYER_SET.has(host)) return true;
+      // Subdomínios whitelist: xxx.supabase.co → supabase.co
+      const parts = host.split('.');
+      for (let i = 1; i < parts.length; i++) {
+        if (PLAYER_SET.has(parts.slice(i).join('.'))) return true;
+      }
+    } catch(e) {}
+    // Relativo = mesmo domínio = nunca bloquear
+    if (!url || url.startsWith('/') || url.startsWith('.') || url.startsWith('#')) return true;
+    return false;
+  }
+
   // ── 1. LISTA DE DOMÍNIOS BLOQUEADOS ───────────────────────
   const AD_HOSTS = [
+    // Google Ads
     'doubleclick.net','googlesyndication.com','googleadservices.com',
-    'adservice.google.com','adnxs.com','advertising.com','ads.yahoo.com',
-    'outbrain.com','taboola.com','revcontent.com','popads.net','popcash.net',
-    'propellerads.com','adsterra.com','hilltopads.net','trafficjunky.com',
-    'exoclick.com','juicyads.com','trafficstars.com','plugrush.com',
-    'adcash.com','clickaine.com','zeropark.com','richpush.co',
-    'mgid.com','voluumtrk.com','engageya.com','adskeeper.co.uk',
+    'adservice.google.com','pagead2.googlesyndication.com',
+    // Redes programáticas
+    'adnxs.com','advertising.com','ads.yahoo.com','ads.microsoft.com',
+    'outbrain.com','taboola.com','revcontent.com',
+    // Pop / push
+    'popads.net','popcash.net','propellerads.com','adsterra.com',
+    'hilltopads.net','trafficjunky.com','exoclick.com','juicyads.com',
+    'trafficstars.com','plugrush.com','adcash.com','clickaine.com',
+    'zeropark.com','richpush.co','pushground.com','megapu.sh',
+    'evadav.com','clickadu.com','ad-maven.com','advendio.com',
+    'adskeeper.co.uk','adskeeper.com',
+    // Trackers / DSP
+    'mgid.com','voluumtrk.com','voluum.com','engageya.com',
     'adtelligent.com','smartadserver.com','rubiconproject.com',
     'openx.net','pubmatic.com','appnexus.com','criteo.com','sovrn.com',
     'lijit.com','33across.com','sharethrough.com','triplelift.com',
@@ -4590,22 +4625,32 @@ window.DoodStreamAPI={
     'bidswitch.net','lkqd.net','undertone.com','synacor.com',
     'adblade.com','adhigh.net','adform.net','adform.com',
     'mathtag.com','bluekai.com','lotame.com','krux.com',
-    'demdex.net','adsrvr.org','turn.com','mxpnl.com',
+    'demdex.net','adsrvr.org','turn.com',
     'popunder.net','trafficshop.com','a-ads.com','coinzilla.io',
     'ad.plus','adhese.com','adhese.net','admixer.net',
     'adcolony.com','ironsrc.com','applovin.com','chartboost.com',
     'unityads.unity3d.com','vungle.com','inmobi.com',
-    'hotjar.com','mouseflow.com','fullstory.com',
+    // Analytics de vigilância (não essenciais)
+    'hotjar.com','mouseflow.com','fullstory.com','clarity.ms',
+    // Redes adicionais comuns em sites de streaming pirata
+    'bebi.com','adspyglass.com','adbull.com','fpadblock.com',
+    'go.ad2up.com','p.ato.mx','realsrv.com','clicksfly.com',
+    'ouo.io','ouo.press','shrinkme.io','bc.vc','za.gl','za.hn',
+    'shorte.st','adfoc.us','linkvertise.com','loot-link.com',
+    'seriea.monster','serieflix.cc','adbistro.com',
+    'onclickads.net','onclicka.com','adtng.com',
+    'tinyads.io','vidads.gr','stfly.me','shrinkearn.com',
+    'earnload.com','cutpaid.com','adshrink.it',
   ];
 
-  // Converte para Set de partes de host para lookup rápido
   const AD_SET = new Set(AD_HOSTS);
 
   function isAdHost(url) {
+    if (!url || typeof url !== 'string') return false;
+    if (isWhitelisted(url)) return false; // nunca bloqueia whitelist
     try {
-      const host = new URL(url).hostname.toLowerCase();
+      const host = new URL(url, location.href).hostname.toLowerCase();
       if (AD_SET.has(host)) return true;
-      // Verifica subdomínios: ads.exemplo.com → exemplo.com
       const parts = host.split('.');
       for (let i = 1; i < parts.length - 1; i++) {
         if (AD_SET.has(parts.slice(i).join('.'))) return true;
@@ -4614,47 +4659,51 @@ window.DoodStreamAPI={
     return false;
   }
 
-  // ── 2. BLOQUEIA window.open (popups / pop-unders) ─────────
+  // ── 2. BLOQUEIA window.open (popups / pop-unders) ──────────
   const _origOpen = window.open;
-  window.open = function(url, ...args) {
+  window.open = function(url, target, features) {
     if (!url) return null;
     try {
-      // Permite apenas abrir dentro do mesmo domínio ou URLs conhecidas e seguras
-      const u = new URL(url, location.href);
-      if (isAdHost(u.href)) { console.debug('[AdBlock] window.open bloqueado:', url); return null; }
-      // Bloqueia aberturas sem interação do usuário (sem trusted event na call stack)
-      if (!window._userInteracting) { console.debug('[AdBlock] window.open bloqueado (sem interação):', url); return null; }
+      if (isAdHost(url)) {
+        console.debug('[AdBlock] window.open bloqueado:', url);
+        return null;
+      }
+      // Bloqueia abertura automática sem gesto do usuário
+      if (!window._userInteracting) {
+        console.debug('[AdBlock] window.open bloqueado (sem interação):', url);
+        return null;
+      }
     } catch(e) { return null; }
-    return _origOpen.call(window, url, ...args);
+    return _origOpen.call(window, url, target, features);
   };
 
-  // Rastreia interação do usuário para distinguir popups legítimos
+  // Rastreia gesto do usuário
   let _uiTimer;
-  ['click','keydown','touchstart'].forEach(ev =>
+  ['click','keydown','touchstart','mousedown'].forEach(ev =>
     document.addEventListener(ev, () => {
       window._userInteracting = true;
       clearTimeout(_uiTimer);
-      _uiTimer = setTimeout(() => { window._userInteracting = false; }, 1000);
+      _uiTimer = setTimeout(() => { window._userInteracting = false; }, 1200);
     }, true)
   );
 
-  // ── 3. INTERCEPTA fetch ────────────────────────────────────
+  // ── 3. INTERCEPTA fetch ─────────────────────────────────────
   const _origFetch = window.fetch;
   window.fetch = function(input, init) {
     const url = typeof input === 'string' ? input : (input?.url || '');
     if (isAdHost(url)) {
       console.debug('[AdBlock] fetch bloqueado:', url);
-      return Promise.reject(new TypeError('AdBlock: requisição bloqueada'));
+      return Promise.reject(new TypeError('AdBlock: bloqueado'));
     }
     return _origFetch.apply(this, arguments);
   };
 
-  // ── 4. INTERCEPTA XMLHttpRequest ──────────────────────────
+  // ── 4. INTERCEPTA XMLHttpRequest ───────────────────────────
   const _origXHROpen = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function(method, url, ...rest) {
     if (isAdHost(url)) {
       console.debug('[AdBlock] XHR bloqueado:', url);
-      Object.defineProperty(this, '_blocked', { value: true });
+      Object.defineProperty(this, '_blocked', { value: true, configurable: true });
     }
     return _origXHROpen.call(this, method, url, ...rest);
   };
@@ -4664,25 +4713,42 @@ window.DoodStreamAPI={
     return _origXHRSend.apply(this, args);
   };
 
-  // ── 5. INTERCEPTA criação de <script> e <iframe> de anúncios via DOM
+  // ── 5. INTERCEPTA criação de <script> e <iframe> via DOM ───
   const _origCreateElement = document.createElement.bind(document);
   document.createElement = function(tag, ...args) {
     const el = _origCreateElement(tag, ...args);
-    if (tag.toLowerCase() === 'script') {
-      const _origSetSrc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
-      if (_origSetSrc) {
-        const origSet = _origSetSrc.set;
-        const origGet = _origSetSrc.get;
+    const tagLow = tag.toLowerCase();
+
+    // Intercepta src de scripts de anúncio
+    if (tagLow === 'script') {
+      const desc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+      if (desc) {
         Object.defineProperty(el, 'src', {
-          get() { return origGet.call(this); },
+          get() { return desc.get.call(this); },
           set(val) {
             if (isAdHost(val)) { console.debug('[AdBlock] script bloqueado:', val); return; }
-            origSet.call(this, val);
+            desc.set.call(this, val);
           },
           configurable: true,
         });
       }
     }
+
+    // Intercepta src de iframes de anúncio (SEM sandbox — não adiciona atributo)
+    if (tagLow === 'iframe') {
+      const desc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
+      if (desc) {
+        Object.defineProperty(el, 'src', {
+          get() { return desc.get.call(this); },
+          set(val) {
+            if (isAdHost(val)) { console.debug('[AdBlock] iframe de anúncio bloqueado:', val); return; }
+            desc.set.call(this, val); // Player passa sem sandbox
+          },
+          configurable: true,
+        });
+      }
+    }
+
     return el;
   };
 
@@ -4693,18 +4759,29 @@ window.DoodStreamAPI={
     'iframe[src*="popads"]','iframe[src*="popcash"]',
     'iframe[src*="propellerads"]','iframe[src*="adsterra"]',
     'iframe[src*="exoclick"]','iframe[src*="trafficjunky"]',
+    'iframe[src*="popunder"]','iframe[src*="onclickads"]',
     'div[id*="ad-"]','div[id*="_ad_"]','div[class*="ad-banner"]',
     'div[class*="adbox"]','div[class*="ad-slot"]','div[class*="adsbox"]',
     'div[id^="google_ads"]','ins.adsbygoogle',
     '[id*="popunder"]','[class*="popunder"]',
     '[id*="pop-up"]','[id*="popup-ad"]',
+    'div[class*="popup-overlay"]:not(.modal-overlay)',
   ].join(',');
+
+  // Elementos do RitiFlix que nunca devem ser removidos
+  const APP_SAFE = '#page-home,#page-search,#page-detail,#page-player,#page-admin,#page-profile,#navbar,.modal-overlay,.mobile-nav,#loader,.video-player';
+
+  function isPlayerIframe(el) {
+    if (el.tagName !== 'IFRAME') return false;
+    const src = el.src || el.getAttribute('src') || '';
+    return isWhitelisted(src) || el.closest('.video-player') !== null;
+  }
 
   function cleanAds(root) {
     try {
       root.querySelectorAll(AD_SELECTORS).forEach(el => {
-        // Não remove elementos internos do RitiFlix
-        if (!el.closest('#page-home,#page-search,#page-detail,#page-player,#page-admin,#page-profile,#navbar,.modal-overlay,.mobile-nav')) {
+        if (isPlayerIframe(el)) return; // nunca remove iframe do player
+        if (!el.closest(APP_SAFE)) {
           console.debug('[AdBlock] elemento removido:', el);
           el.remove();
         }
@@ -4716,27 +4793,30 @@ window.DoodStreamAPI={
     for (const m of mutations) {
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) continue;
-        // Checa o próprio nó
+
+        // Nunca toca no iframe do player
+        if (isPlayerIframe(node)) continue;
+
         try {
           if (node.matches && node.matches(AD_SELECTORS)) {
             const src = node.src || node.getAttribute('src') || '';
-            if (isAdHost(src) || node.id?.includes('ad') || node.className?.includes('ad')) {
-              console.debug('[AdBlock] nó removido via MutationObserver:', node);
+            if (isAdHost(src) || node.id?.includes('ad') || node.className?.toString().includes('ad')) {
+              console.debug('[AdBlock] nó removido:', node);
               node.remove(); continue;
             }
           }
         } catch(e) {}
-        // Checa iframes com src de anúncio
+
         if (node.tagName === 'IFRAME') {
           const src = node.src || node.getAttribute('src') || '';
           if (isAdHost(src)) { node.remove(); continue; }
         }
-        // Checa scripts de anúncio
+
         if (node.tagName === 'SCRIPT') {
           const src = node.src || node.getAttribute('src') || '';
           if (isAdHost(src)) { node.remove(); continue; }
         }
-        // Limpa filhos
+
         if (node.querySelectorAll) cleanAds(node);
       }
     }
@@ -4745,22 +4825,25 @@ window.DoodStreamAPI={
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   // ── 7. BLOQUEIA redirecionamentos suspeitos ─────────────────
-  const _origAssign   = location.assign.bind(location);
-  const _origReplace  = location.replace.bind(location);
+  const _origAssign  = location.assign.bind(location);
+  const _origReplace = location.replace.bind(location);
   try {
     Object.defineProperty(location, 'assign', {
-      value(url) { if (isAdHost(url)) { console.debug('[AdBlock] location.assign bloqueado:', url); return; } _origAssign(url); },
-      configurable: true,
+      value(url) {
+        if (isAdHost(url)) { console.debug('[AdBlock] location.assign bloqueado:', url); return; }
+        _origAssign(url);
+      }, configurable: true,
     });
     Object.defineProperty(location, 'replace', {
-      value(url) { if (isAdHost(url)) { console.debug('[AdBlock] location.replace bloqueado:', url); return; } _origReplace(url); },
-      configurable: true,
+      value(url) {
+        if (isAdHost(url)) { console.debug('[AdBlock] location.replace bloqueado:', url); return; }
+        _origReplace(url);
+      }, configurable: true,
     });
   } catch(e) {}
 
-  // Intercepta pushState/replaceState para evitar redirect silencioso
-  const _origPush    = history.pushState.bind(history);
-  const _origRepl    = history.replaceState.bind(history);
+  const _origPush = history.pushState.bind(history);
+  const _origRepl = history.replaceState.bind(history);
   history.pushState = function(state, title, url) {
     if (url && isAdHost(String(url))) { console.debug('[AdBlock] pushState bloqueado:', url); return; }
     return _origPush(state, title, url);
@@ -4770,18 +4853,16 @@ window.DoodStreamAPI={
     return _origRepl(state, title, url);
   };
 
-  // ── 8. BLOQUEIA overlays de clique (técnica comum de pop-under) ──
-  // Remove elementos transparentes de tamanho total colocados sobre o conteúdo
+  // ── 8. BLOQUEIA overlays invisíveis de clique (pop-under) ──
   function removeClickOverlays() {
     document.querySelectorAll('div,a').forEach(el => {
-      // Ignora elementos internos do app
-      if (el.closest('#navbar,#page-home,#page-search,#page-detail,#page-player,#page-admin,#page-profile,.modal-overlay,.mobile-nav,#loader')) return;
+      if (el.closest('#navbar,#page-home,#page-search,#page-detail,#page-player,#page-admin,#page-profile,.modal-overlay,.mobile-nav,#loader,.video-player')) return;
       const style = window.getComputedStyle(el);
       const rect  = el.getBoundingClientRect();
       if (
         style.position === 'fixed' &&
         parseFloat(style.opacity) < 0.05 &&
-        rect.width > window.innerWidth * 0.8 &&
+        rect.width  > window.innerWidth  * 0.8 &&
         rect.height > window.innerHeight * 0.8
       ) {
         console.debug('[AdBlock] overlay de clique removido:', el);
@@ -4791,7 +4872,16 @@ window.DoodStreamAPI={
   }
   setInterval(removeClickOverlays, 2000);
 
-  console.info('[RitiFlix AdBlock] ativo — bloqueando popups, redirects e redes de anúncios.');
+  // ── 9. BLOQUEIA navigator.sendBeacon para trackers ─────────
+  if (navigator.sendBeacon) {
+    const _origBeacon = navigator.sendBeacon.bind(navigator);
+    navigator.sendBeacon = function(url, data) {
+      if (isAdHost(url)) { console.debug('[AdBlock] beacon bloqueado:', url); return true; }
+      return _origBeacon(url, data);
+    };
+  }
+
+  console.info('[RitiFlix AdBlock v2] ativo — popups, redirects, overlays e redes de anúncios bloqueados. Player protegido ✓');
 })();
 </script>
 </body>
