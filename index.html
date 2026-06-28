@@ -589,10 +589,13 @@ input:focus~.search-kbd,.search-wrap input:focus~.search-kbd{opacity:0}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
 <script>
+// Página inicial padrão desta entrada do site (root = home).
+// Os arquivos em /Admin/ e /Perfil/ definem window.RITIFLIX_ENTRY antes deste ponto.
+window.RITIFLIX_ENTRY = window.RITIFLIX_ENTRY || 'home';
 window._loaderKill = setTimeout(function(){
   var l = document.getElementById('loader');
   if(l){ l.style.opacity='0'; setTimeout(function(){ l.style.display='none'; }, 500); }
-  if(typeof navigate === 'function') navigate('home');
+  if(typeof navigate === 'function') navigate(window.RITIFLIX_ENTRY);
 }, 8000);
 document.addEventListener('DOMContentLoaded', function() {
   if (window.supabase && window.supabase.createClient) {
@@ -4499,7 +4502,7 @@ async function initApp() {
   try { await Promise.race([checkAuth(), new Promise(resolve=>setTimeout(resolve,4000))]); } catch(e) { currentUser=null; }
   try { loadHeroBannerSettings(); } catch(e) {}
   hideLoader();
-  navigate('home');
+  navigate(window.RITIFLIX_ENTRY || 'home');
 }
 
 document.addEventListener('supabaseReady', initApp);
