@@ -559,6 +559,50 @@ input:focus~.search-kbd,.search-wrap input:focus~.search-kbd{opacity:0}
 
   .notif{left:1rem;right:1rem;bottom:1rem;max-width:none}
 }
+/* ===== SALAS / WATCH PARTY ===== */
+.salas-header{padding:2.5rem 2rem 1rem;max-width:1600px;margin:0 auto}
+.salas-header h1{font-family:'Playfair Display',serif;font-size:1.9rem;margin-bottom:.4rem}
+.salas-header p{color:var(--text2);font-size:.9rem;max-width:560px;line-height:1.6}
+.salas-toolbar{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:1.5rem}
+.salas-search{flex:1;min-width:220px;position:relative}
+.salas-search input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:.65rem 1rem;border-radius:24px;font-size:.88rem;font-family:'Outfit',sans-serif}
+.salas-search input:focus{outline:none;border-color:var(--gold)}
+.salas-empty{padding:3rem 1rem;text-align:center;color:var(--text3);font-size:.9rem;grid-column:1/-1}
+.sala-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .25s;display:flex;flex-direction:column}
+.sala-card:hover{transform:translateY(-5px);border-color:rgba(201,168,76,0.35);box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.sala-card-img{position:relative;aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:2.5rem;overflow:hidden}
+.sala-card-img img{width:100%;height:100%;object-fit:cover}
+.sala-lock{position:absolute;top:.5rem;right:.5rem;background:rgba(7,9,15,0.75);border:1px solid rgba(201,168,76,0.3);border-radius:6px;padding:.2rem .5rem;font-size:.7rem;color:var(--gold)}
+.sala-card-info{padding:.85rem .95rem;flex:1;display:flex;flex-direction:column;gap:.3rem}
+.sala-card-info .sn{font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sala-card-info .sm{font-size:.75rem;color:var(--text3)}
+.sala-card-info .sh{font-size:.72rem;color:var(--text2)}
+.sala-topbar{display:flex;align-items:center;gap:.75rem;background:linear-gradient(90deg,rgba(201,168,76,0.1),rgba(201,168,76,0.02));border:1px solid rgba(201,168,76,0.25);border-radius:12px;padding:.65rem 1rem;margin-bottom:1rem;flex-wrap:wrap}
+.sala-topbar-icon{font-size:1.3rem}
+.sala-topbar-info{display:flex;flex-direction:column;flex:1;min-width:120px}
+.sala-topbar-info strong{font-size:.9rem}
+.sala-topbar-info span{font-size:.72rem;color:var(--text3)}
+.sala-chat-fab{position:fixed;bottom:1.5rem;right:1.5rem;width:54px;height:54px;border-radius:50%;background:var(--grad);border:none;color:#07090f;font-size:1.4rem;cursor:pointer;box-shadow:0 8px 28px rgba(201,168,76,0.35);z-index:900;display:flex;align-items:center;justify-content:center}
+.sala-chat-badge{position:absolute;top:-4px;right:-4px;background:#e53e3e;color:#fff;font-size:.65rem;font-weight:700;border-radius:50%;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 3px}
+.sala-chat-panel{position:fixed;bottom:6rem;right:1.5rem;width:320px;max-height:60vh;background:var(--bg3);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);z-index:900;display:flex;flex-direction:column;overflow:hidden}
+.sala-chat-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid var(--border);font-size:.85rem}
+.sala-chat-msgs{flex:1;overflow-y:auto;padding:.75rem 1rem;display:flex;flex-direction:column;gap:.55rem;min-height:160px}
+.sala-msg{font-size:.8rem;line-height:1.4;word-break:break-word}
+.sala-msg b{color:var(--gold);font-weight:700}
+.sala-chat-input-row{display:flex;gap:.5rem;padding:.65rem .75rem;border-top:1px solid var(--border)}
+.sala-chat-input-row input{flex:1;background:var(--bg4);border:1px solid var(--border);color:var(--text);padding:.5rem .75rem;border-radius:20px;font-size:.82rem;font-family:'Outfit',sans-serif}
+.sala-chat-input-row input:focus{outline:none;border-color:var(--gold)}
+.sala-mini-search{position:relative}
+.sala-mini-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg3);border:1px solid rgba(201,168,76,0.25);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,0.55);z-index:400;max-height:260px;overflow-y:auto}
+.sala-mini-item{display:flex;align-items:center;gap:.65rem;padding:.55rem .85rem;cursor:pointer;border-bottom:1px solid rgba(30,45,71,0.5);font-size:.85rem}
+.sala-mini-item:hover{background:var(--bg4)}
+.sala-selected-preview{display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;background:var(--bg4);border-radius:10px;margin-top:.5rem;font-size:.85rem}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem 0}
+.toggle-switch{position:relative;width:44px;height:24px;background:var(--bg4);border-radius:14px;cursor:pointer;border:1px solid var(--border);flex-shrink:0;transition:all .2s}
+.toggle-switch.on{background:var(--grad);border-color:transparent}
+.toggle-switch .knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:all .2s}
+.toggle-switch.on .knob{left:24px}
+@media(max-width:480px){.sala-chat-panel{right:.6rem;left:.6rem;width:auto;bottom:5.25rem}.sala-chat-fab{right:1rem;bottom:1rem}}
 @media(max-width:480px){
   .stats-grid{grid-template-columns:1fr 1fr}
   .hero-title{font-size:1.7rem}
@@ -611,6 +655,20 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- NOTIFICATION -->
 <div class="notif" id="notif"></div>
 
+<!-- SALA CHAT (Watch Party) -->
+<button class="sala-chat-fab hidden" id="salaChatFab" onclick="toggleSalaChatPanel()">💬<span class="sala-chat-badge hidden" id="salaChatBadge">0</span></button>
+<div class="sala-chat-panel hidden" id="salaChatPanel">
+  <div class="sala-chat-header">
+    <strong>💬 Chat da Sala</strong>
+    <button class="modal-close" style="position:static" onclick="toggleSalaChatPanel()">✕</button>
+  </div>
+  <div class="sala-chat-msgs" id="salaChatMsgs"></div>
+  <div class="sala-chat-input-row">
+    <input type="text" id="salaChatInput" placeholder="Diga algo..." maxlength="300" onkeydown="if(event.key==='Enter')sendSalaMsg()">
+    <button class="btn btn-red" style="padding:.5rem .9rem" onclick="sendSalaMsg()">➤</button>
+  </div>
+</div>
+
 <!-- NAVBAR -->
 <nav id="navbar">
   <div class="nav-inner">
@@ -621,6 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <a onclick="navigate('search','Filmes')" data-page="movies">Filmes</a>
       <a onclick="navigate('search','Séries')" data-page="series">Séries</a>
       <a onclick="navigate('search','Lançamentos')" data-page="releases">Lançamentos</a>
+      <a onclick="navigate('salas')" data-page="salas">🎉 Salas</a>
       <a onclick="navigate('search','Animação')" data-page="animation">Animação</a>
       <a onclick="navigate('search','Ação')" data-page="acao">Ação</a>
       <a onclick="navigate('search','Documentário')" data-page="documentarios">Documentários</a>
@@ -670,8 +729,9 @@ document.addEventListener('DOMContentLoaded', function() {
   <a onclick="navigate('search');closeMobileMenu()">🔍 Explorar</a>
   <a onclick="navigate('search','Filmes');closeMobileMenu()">🎬 Filmes</a>
   <a onclick="navigate('search','Séries');closeMobileMenu()">📺 Séries</a>
-  <a onclick="navigate('search','Lançamentos');closeMobileMenu()">🆕 Lançamentos</a>
-  <a onclick="navigate('search','Animação');closeMobileMenu()">🎌 Animação</a>
+  <a onclick="navigate('search','Lançamentos');closeMobileMenu()" data-page="releases">🆕 Lançamentos</a>
+  <a onclick="navigate('salas');closeMobileMenu()" data-page="salas">🎉 Salas</a>
+  <a onclick="navigate('search','Animação');closeMobileMenu()" data-page="animation">🎌 Animação</a>
   <a onclick="navigate('search','Ação');closeMobileMenu()">⚔️ Ação</a>
   <a onclick="navigate('search','Comédia');closeMobileMenu()">😂 Comédia</a>
   <a onclick="navigate('search','Drama');closeMobileMenu()">🎭 Drama</a>
@@ -851,6 +911,23 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
+<!-- ===== SALAS (WATCH PARTY) ===== -->
+<div id="page-salas" class="page">
+  <div class="salas-header">
+    <h1>🎉 Salas Watch Party</h1>
+    <p>Crie uma sala com ou sem senha, escolha um filme ou série e assista junto com a galera. Quando o anfitrião troca de episódio, atualiza pra todo mundo na sala automaticamente.</p>
+    <div class="salas-toolbar">
+      <div class="salas-search">
+        <input type="text" id="salasSearchInput" placeholder="🔍 Buscar sala pelo nome..." oninput="onSalasSearchInput(this.value)">
+      </div>
+      <button class="btn btn-red" onclick="openCriarSalaModal()">+ Criar Sala</button>
+    </div>
+  </div>
+  <div class="section" style="padding-top:1rem">
+    <div class="cards-grid" id="salasGrid"></div>
+  </div>
+</div>
+
 <!-- ===== DETAIL ===== -->
 <div id="page-detail" class="page">
   <div class="detail-hero">
@@ -905,6 +982,15 @@ document.addEventListener('DOMContentLoaded', function() {
     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
       <button class="btn btn-ghost" style="font-size:.8rem" onclick="navigate('home')">← Início</button>
       <span style="color:var(--text3);font-size:.85rem" id="playerBreadcrumb"></span>
+    </div>
+    <div class="sala-topbar hidden" id="salaTopBar">
+      <span class="sala-topbar-icon">🎉</span>
+      <div class="sala-topbar-info">
+        <strong id="salaTopBarNome"></strong>
+        <span id="salaTopBarViewers">👥 1 assistindo</span>
+      </div>
+      <button class="btn btn-ghost hidden" style="font-size:.78rem" id="salaTrocarBtn" onclick="openTrocarTituloModal()">🔄 Trocar título</button>
+      <button class="btn btn-ghost" style="font-size:.78rem" onclick="leaveSala()">🚪 Sair da sala</button>
     </div>
     <div class="video-player" id="videoPlayer">
       <div class="player-inner" id="playerContent">
@@ -1106,6 +1192,79 @@ document.addEventListener('DOMContentLoaded', function() {
       <input type="email" class="form-input" id="editEmail">
     </div>
     <button class="form-btn" onclick="saveProfile()">Salvar alterações</button>
+  </div>
+</div>
+
+<!-- CRIAR SALA -->
+<div class="modal-overlay hidden" id="modal-criarSala" onclick="closeModalOverlay(event,'criarSala')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('criarSala')">✕</button>
+    <div class="modal-logo"><span>🎉 Criar Sala</span></div>
+    <div class="modal-subtitle">Configure sua sala de watch party</div>
+    <div class="form-group">
+      <label class="form-label">Nome da sala</label>
+      <input type="text" class="form-input" id="salaNome" placeholder="Ex: Cinema da galera" maxlength="40">
+      <div class="form-error hidden" id="salaNomeErr"></div>
+    </div>
+    <div class="form-group sala-mini-search">
+      <label class="form-label">Filme ou série</label>
+      <input type="text" class="form-input" id="salaAnimeBusca" placeholder="🔍 Buscar no catálogo..." oninput="searchSalaAnime(this.value,'criar')" autocomplete="off">
+      <div class="sala-mini-dropdown" id="salaAnimeDropdown"></div>
+      <div class="sala-selected-preview hidden" id="salaAnimePreview"></div>
+      <div class="form-error hidden" id="salaAnimeErr"></div>
+    </div>
+    <div class="form-group hidden" id="salaEpGroup">
+      <label class="form-label">Episódio inicial</label>
+      <select class="form-select" id="salaEpSelect"></select>
+    </div>
+    <div class="form-group">
+      <div class="toggle-row">
+        <label class="form-label" style="margin:0">🔒 Proteger com senha</label>
+        <div class="toggle-switch" id="salaSenhaToggle" onclick="toggleSalaSenha()"><div class="knob"></div></div>
+      </div>
+      <div class="hidden" id="salaSenhaGroup" style="margin-top:.5rem">
+        <input type="password" class="form-input" id="salaSenha" placeholder="Mínimo 4 caracteres">
+        <div class="form-error hidden" id="salaSenhaErr"></div>
+      </div>
+    </div>
+    <div class="form-error hidden" id="salaCriarErr" style="text-align:center;margin-bottom:.75rem;padding:.5rem;background:rgba(229,9,20,0.1);border-radius:6px;border:1px solid rgba(229,9,20,0.2)"></div>
+    <button class="form-btn" onclick="criarSala()" id="salaCriarBtn">Criar e entrar na sala</button>
+  </div>
+</div>
+
+<!-- SENHA DA SALA -->
+<div class="modal-overlay hidden" id="modal-senhaSala" onclick="closeModalOverlay(event,'senhaSala')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('senhaSala')">✕</button>
+    <div class="modal-logo"><span>🔒 Sala protegida</span></div>
+    <div class="modal-subtitle">Digite a senha para entrar em "<span id="senhaSalaNome"></span>"</div>
+    <div class="form-group">
+      <label class="form-label">Senha</label>
+      <input type="password" class="form-input" id="senhaSalaInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')confirmSalaSenha()">
+      <div class="form-error hidden" id="senhaSalaErr"></div>
+    </div>
+    <button class="form-btn" onclick="confirmSalaSenha()">Entrar</button>
+  </div>
+</div>
+
+<!-- TROCAR TÍTULO DA SALA (host) -->
+<div class="modal-overlay hidden" id="modal-trocarTitulo" onclick="closeModalOverlay(event,'trocarTitulo')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('trocarTitulo')">✕</button>
+    <div class="modal-logo"><span>🔄 Trocar título</span></div>
+    <div class="modal-subtitle">Escolha o novo filme/série para a sala</div>
+    <div class="form-group sala-mini-search">
+      <label class="form-label">Filme ou série</label>
+      <input type="text" class="form-input" id="trocarAnimeBusca" placeholder="🔍 Buscar no catálogo..." oninput="searchSalaAnime(this.value,'trocar')" autocomplete="off">
+      <div class="sala-mini-dropdown" id="trocarAnimeDropdown"></div>
+      <div class="sala-selected-preview hidden" id="trocarAnimePreview"></div>
+      <div class="form-error hidden" id="trocarAnimeErr"></div>
+    </div>
+    <div class="form-group hidden" id="trocarEpGroup">
+      <label class="form-label">Episódio</label>
+      <select class="form-select" id="trocarEpSelect"></select>
+    </div>
+    <button class="form-btn" onclick="confirmTrocarTitulo()">Atualizar sala</button>
   </div>
 </div>
 
@@ -1696,8 +1855,16 @@ async function doForgotPw() {
 let currentPage = 'home';
 let currentAnimeId = null;
 let currentEpId = null;
+// ── Watch Party (Salas) ──
+let currentRoom = null;      // {id, nome, host_id, anime_id, ep_id, isHost}
+let _salaChannel = null;
+window._salaSelected = { criar: null, trocar: null };
 
 function navigate(page, filter) {
+  // Watch Party: se o usuário sai do player (ou entra no player fora do fluxo de sala), sai da sala ativa
+  if (currentRoom && !(page === 'player' && filter && filter.salaId === currentRoom.id)) {
+    leaveSala(false);
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-links a').forEach(a => {
     a.classList.remove('active');
@@ -1745,6 +1912,9 @@ function navigate(page, filter) {
   } else if (page === 'player') {
     document.getElementById('page-player').classList.add('active');
     renderPlayer(filter); window.scrollTo(0,0);
+  } else if (page === 'salas') {
+    document.getElementById('page-salas').classList.add('active');
+    renderSalas(); window.scrollTo(0,0);
   } else if (page === 'admin') {
     if (!currentUser) { showNotif('❌ Faça login primeiro.','error'); openModal('login'); return; }
     if (currentUser.role !== 'admin') { showNotif('❌ Acesso negado.','error'); return; }
@@ -1757,6 +1927,328 @@ function navigate(page, filter) {
   }
   closeMobileMenu();
 }
+
+// ============================================================
+// SALAS / WATCH PARTY
+// ============================================================
+// Tabelas Supabase necessárias: "salas" e "salas_mensagens".
+// Veja o arquivo salas_setup.sql para o script de criação completo.
+
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+let _salasDebounce;
+function onSalasSearchInput(q) {
+  clearTimeout(_salasDebounce);
+  _salasDebounce = setTimeout(() => renderSalas(q), 250);
+}
+
+async function renderSalas(q) {
+  const grid = document.getElementById('salasGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="salas-empty">Carregando salas...</div>';
+  try {
+    let query = sb.from('salas').select('*, animes(title,emoji,poster,type,genres)').eq('ativa', true).order('created_at', { ascending: false });
+    const { data: salas, error } = await query;
+    if (error) throw error;
+    let list = salas || [];
+    const term = (q || document.getElementById('salasSearchInput')?.value || '').trim().toLowerCase();
+    if (term) list = list.filter(s => s.nome.toLowerCase().includes(term));
+    if (!list.length) {
+      grid.innerHTML = `<div class="salas-empty">${term ? '🔍 Nenhuma sala encontrada com esse nome.' : '🎬 Nenhuma sala ativa agora. Que tal criar a primeira?'}</div>`;
+      return;
+    }
+    grid.innerHTML = list.map(salaCardHTML).join('');
+  } catch(e) {
+    console.error('renderSalas error:', e);
+    grid.innerHTML = '<div class="salas-empty">⚠️ Não foi possível carregar as salas. Verifique se a tabela "salas" existe no Supabase.</div>';
+  }
+}
+
+function salaCardHTML(s) {
+  const a = s.animes || {};
+  const isMovie = a.type === 'filme' || (!a.type && (a.genres||[]).includes('Filme'));
+  return `<div class="sala-card" onclick="joinSala(${s.id})">
+    <div class="sala-card-img">
+      ${a.poster ? `<img src="${a.poster}" loading="lazy">` : `<span>${a.emoji||'🎬'}</span>`}
+      ${s.senha_hash ? '<span class="sala-lock">🔒 Privada</span>' : ''}
+    </div>
+    <div class="sala-card-info">
+      <div class="sn">${sanitize(s.nome)}</div>
+      <div class="sm">${sanitize(a.title || 'Título removido')} ${isMovie?'• 🎬 Filme':'• 📺 Série'}</div>
+      <div class="sh">👤 Anfitrião: ${sanitize(s.host_nome || '—')}</div>
+    </div>
+  </div>`;
+}
+
+// ── Mini-busca de catálogo (usada nos modais Criar Sala e Trocar Título) ──
+let _salaSearchDebounce;
+function searchSalaAnime(q, ctx) {
+  clearTimeout(_salaSearchDebounce);
+  const dd = document.getElementById(ctx === 'trocar' ? 'trocarAnimeDropdown' : 'salaAnimeDropdown');
+  if (!q || q.trim().length < 2) { if (dd) dd.style.display = 'none'; return; }
+  _salaSearchDebounce = setTimeout(async () => {
+    const { data } = await sb.from('animes').select('id,title,emoji,poster,type,genres').ilike('title', '%'+q.trim()+'%').limit(8);
+    if (!dd) return;
+    if (!data || !data.length) { dd.innerHTML = '<div class="sala-mini-item" style="cursor:default;color:var(--text3)">Nenhum título encontrado</div>'; dd.style.display='block'; return; }
+    dd.innerHTML = data.map((a,i) => `<div class="sala-mini-item" onmousedown="window._salaPickAnime('${ctx}',${i})">
+        ${a.poster ? `<img src="${a.poster}" style="width:34px;height:48px;object-fit:cover;border-radius:5px;flex-shrink:0">` : `<span style="font-size:1.3rem">${a.emoji}</span>`}
+        <span>${sanitize(a.title)}</span>
+      </div>`).join('');
+    dd.style.display = 'block';
+    window._salaSearchResults = data;
+    window._salaPickAnime = (ctx2, idx) => selectSalaAnime(window._salaSearchResults[idx], ctx2);
+  }, 350);
+}
+
+async function selectSalaAnime(anime, ctx) {
+  window._salaSelected[ctx] = { id: anime.id, title: anime.title, emoji: anime.emoji, poster: anime.poster };
+  const isMovie = anime.type === 'filme' || (!anime.type && (anime.genres||[]).includes('Filme'));
+  const dd = document.getElementById(ctx === 'trocar' ? 'trocarAnimeDropdown' : 'salaAnimeDropdown');
+  if (dd) dd.style.display = 'none';
+  const buscaInput = document.getElementById(ctx === 'trocar' ? 'trocarAnimeBusca' : 'salaAnimeBusca');
+  if (buscaInput) buscaInput.value = anime.title;
+  const preview = document.getElementById(ctx === 'trocar' ? 'trocarAnimePreview' : 'salaAnimePreview');
+  if (preview) {
+    preview.classList.remove('hidden');
+    preview.innerHTML = `${anime.poster ? `<img src="${anime.poster}" style="width:34px;height:48px;object-fit:cover;border-radius:5px">` : `<span style="font-size:1.5rem">${anime.emoji}</span>`}<span>✓ <strong>${sanitize(anime.title)}</strong></span>`;
+  }
+  const epGroup = document.getElementById(ctx === 'trocar' ? 'trocarEpGroup' : 'salaEpGroup');
+  const epSelect = document.getElementById(ctx === 'trocar' ? 'trocarEpSelect' : 'salaEpSelect');
+  if (!epGroup || !epSelect) return;
+  if (isMovie) {
+    const { data: eps } = await sb.from('episodes').select('id').eq('anime_id', anime.id).limit(1);
+    epGroup.classList.add('hidden');
+    window._salaSelected[ctx].ep_id = eps && eps[0] ? eps[0].id : null;
+  } else {
+    const { data: eps } = await sb.from('episodes').select('id,season,num,title').eq('anime_id', anime.id).order('season',{ascending:true}).order('num',{ascending:true});
+    if (eps && eps.length) {
+      epSelect.innerHTML = eps.map(e => `<option value="${e.id}">T${e.season||1} Ep.${e.num} — ${sanitize(e.title||'')}</option>`).join('');
+      window._salaSelected[ctx].ep_id = eps[0].id;
+      epGroup.classList.remove('hidden');
+    } else {
+      epGroup.classList.add('hidden');
+      window._salaSelected[ctx].ep_id = null;
+    }
+  }
+}
+
+function toggleSalaSenha() {
+  const t = document.getElementById('salaSenhaToggle');
+  const g = document.getElementById('salaSenhaGroup');
+  t.classList.toggle('on');
+  g.classList.toggle('hidden', !t.classList.contains('on'));
+  if (!t.classList.contains('on')) document.getElementById('salaSenha').value = '';
+}
+
+function openCriarSalaModal() {
+  if (!currentUser) { showNotif('❌ Faça login para criar uma sala.', 'error'); openModal('login'); return; }
+  document.getElementById('salaNome').value = '';
+  document.getElementById('salaAnimeBusca').value = '';
+  document.getElementById('salaAnimePreview').classList.add('hidden');
+  document.getElementById('salaEpGroup').classList.add('hidden');
+  document.getElementById('salaSenha').value = '';
+  document.getElementById('salaSenhaGroup').classList.add('hidden');
+  document.getElementById('salaSenhaToggle').classList.remove('on');
+  window._salaSelected.criar = null;
+  openModal('criarSala');
+}
+
+async function criarSala() {
+  clearFormErrors('sala');
+  const nome = sanitize(document.getElementById('salaNome').value.trim());
+  const escolhido = window._salaSelected.criar;
+  const protegida = document.getElementById('salaSenhaToggle').classList.contains('on');
+  const senha = document.getElementById('salaSenha').value;
+  let ok = true;
+  if (!nome || nome.length < 3) { showFieldError('salaNome','salaNomeErr','Digite um nome com pelo menos 3 caracteres.'); ok = false; }
+  if (!escolhido) { showErr('salaAnimeErr','Escolha um filme ou série do catálogo.'); ok = false; }
+  if (protegida && senha.length < 4) { showFieldError('salaSenha','salaSenhaErr','A senha precisa ter pelo menos 4 caracteres.'); ok = false; }
+  if (!ok) return;
+  const btn = document.getElementById('salaCriarBtn');
+  btn.disabled = true; btn.textContent = 'Criando...';
+  try {
+    const senhaHash = protegida ? await sha256Hex(senha) : null;
+    const { data: row, error } = await sb.from('salas').insert({
+      nome, senha_hash: senhaHash, anime_id: escolhido.id, ep_id: escolhido.ep_id,
+      host_id: currentUser.id, host_nome: currentUser.username, ativa: true
+    }).select().single();
+    if (error) throw error;
+    closeModal('criarSala');
+    showNotif('🎉 Sala criada! Bom filme :)', 'success');
+    enterSala(row, true);
+  } catch(e) {
+    console.error('criarSala error:', e);
+    showErr('salaCriarErr', '❌ Não foi possível criar a sala. Verifique se a tabela "salas" existe no Supabase.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Criar e entrar na sala';
+  }
+}
+
+async function joinSala(id) {
+  if (!currentUser) { showNotif('❌ Faça login para entrar em uma sala.', 'error'); openModal('login'); return; }
+  const { data: sala, error } = await sb.from('salas').select('*').eq('id', id).eq('ativa', true).maybeSingle();
+  if (error || !sala) { showNotif('❌ Essa sala não existe mais.', 'error'); renderSalas(); return; }
+  if (sala.senha_hash && sala.host_id !== currentUser.id) {
+    window._pendingSalaId = id;
+    document.getElementById('senhaSalaNome').textContent = sanitize(sala.nome);
+    document.getElementById('senhaSalaInput').value = '';
+    openModal('senhaSala');
+    return;
+  }
+  enterSala(sala, sala.host_id === currentUser.id);
+}
+
+async function confirmSalaSenha() {
+  clearFormErrors('senhaSala');
+  const id = window._pendingSalaId;
+  const val = document.getElementById('senhaSalaInput').value;
+  if (!val || val.length < 4) { showFieldError('senhaSalaInput','senhaSalaErr','Digite a senha da sala.'); return; }
+  const { data: sala } = await sb.from('salas').select('*').eq('id', id).maybeSingle();
+  if (!sala) { showErr('senhaSalaErr', 'Sala não encontrada.'); return; }
+  const hash = await sha256Hex(val);
+  if (hash !== sala.senha_hash) { showFieldError('senhaSalaInput','senhaSalaErr','Senha incorreta.'); return; }
+  closeModal('senhaSala');
+  enterSala(sala, false);
+}
+
+async function enterSala(sala, isHost) {
+  currentRoom = { id: sala.id, nome: sala.nome, host_id: sala.host_id, anime_id: sala.anime_id, ep_id: sala.ep_id, isHost: !!isHost };
+  navigate('player', { animeId: sala.anime_id, epId: sala.ep_id, salaId: sala.id });
+  const bar = document.getElementById('salaTopBar');
+  if (bar) {
+    bar.classList.remove('hidden');
+    document.getElementById('salaTopBarNome').textContent = '🎬 ' + sala.nome;
+    document.getElementById('salaTrocarBtn').classList.toggle('hidden', !isHost);
+  }
+  document.getElementById('salaChatFab').classList.remove('hidden');
+  document.getElementById('salaChatMsgs').innerHTML = '';
+  subscribeSala(sala.id);
+  loadSalaMsgsHistory(sala.id);
+}
+
+function subscribeSala(id) {
+  if (_salaChannel) { try { sb.removeChannel(_salaChannel); } catch(e){} _salaChannel = null; }
+  _salaChannel = sb.channel('sala_' + id, { config: { presence: { key: (currentUser?.id || 'anon_'+Math.random()) } } });
+  _salaChannel
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'salas', filter: 'id=eq.'+id }, payload => onSalaUpdate(payload.new))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'salas_mensagens', filter: 'sala_id=eq.'+id }, payload => appendSalaMsg(payload.new))
+    .on('presence', { event: 'sync' }, () => updateSalaViewerCount())
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED' && currentUser) {
+        _salaChannel.track({ username: currentUser.username });
+      }
+    });
+}
+
+function updateSalaViewerCount() {
+  if (!_salaChannel) return;
+  const state = _salaChannel.presenceState();
+  const count = Object.keys(state || {}).length || 1;
+  const el = document.getElementById('salaTopBarViewers');
+  if (el) el.textContent = '👥 ' + count + (count === 1 ? ' assistindo' : ' assistindo juntos');
+}
+
+function onSalaUpdate(newRow) {
+  if (!currentRoom || newRow.id !== currentRoom.id) return;
+  if (currentRoom.isHost) return; // o próprio anfitrião já atualizou localmente
+  if (newRow.ep_id !== currentRoom.ep_id || newRow.anime_id !== currentRoom.anime_id) {
+    currentRoom.anime_id = newRow.anime_id; currentRoom.ep_id = newRow.ep_id;
+    showNotif('🔄 O anfitrião trocou o título da sala.', 'success');
+    renderPlayer({ animeId: newRow.anime_id, epId: newRow.ep_id, salaId: newRow.id });
+  }
+}
+
+async function leaveSala(showMsg = true) {
+  if (!currentRoom) return;
+  if (_salaChannel) { try { sb.removeChannel(_salaChannel); } catch(e){} _salaChannel = null; }
+  currentRoom = null;
+  document.getElementById('salaTopBar')?.classList.add('hidden');
+  document.getElementById('salaChatFab')?.classList.add('hidden');
+  document.getElementById('salaChatPanel')?.classList.add('hidden');
+  if (showMsg) { showNotif('👋 Você saiu da sala.', 'success'); navigate('salas'); }
+}
+
+// ── Trocar título (host) ──
+function openTrocarTituloModal() {
+  if (!currentRoom || !currentRoom.isHost) return;
+  document.getElementById('trocarAnimeBusca').value = '';
+  document.getElementById('trocarAnimePreview').classList.add('hidden');
+  document.getElementById('trocarEpGroup').classList.add('hidden');
+  window._salaSelected.trocar = null;
+  openModal('trocarTitulo');
+}
+
+async function confirmTrocarTitulo() {
+  clearFormErrors('trocar');
+  const escolhido = window._salaSelected.trocar;
+  if (!escolhido) { showErr('trocarAnimeErr', 'Escolha um filme ou série.'); return; }
+  if (!currentRoom || !currentRoom.isHost) return;
+  try {
+    const { error } = await sb.from('salas').update({ anime_id: escolhido.id, ep_id: escolhido.ep_id }).eq('id', currentRoom.id);
+    if (error) throw error;
+    currentRoom.anime_id = escolhido.id; currentRoom.ep_id = escolhido.ep_id;
+    closeModal('trocarTitulo');
+    showNotif('🔄 Título da sala atualizado para todos.', 'success');
+    renderPlayer({ animeId: escolhido.id, epId: escolhido.ep_id, salaId: currentRoom.id });
+  } catch(e) {
+    console.error('confirmTrocarTitulo error:', e);
+    showErr('trocarAnimeErr', '❌ Não foi possível atualizar a sala.');
+  }
+}
+
+// ── Chat da sala ──
+function toggleSalaChatPanel() {
+  const p = document.getElementById('salaChatPanel');
+  p.classList.toggle('hidden');
+  if (!p.classList.contains('hidden')) {
+    document.getElementById('salaChatBadge').classList.add('hidden');
+    document.getElementById('salaChatBadge').textContent = '0';
+    const msgs = document.getElementById('salaChatMsgs');
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+
+async function loadSalaMsgsHistory(salaId) {
+  const { data } = await sb.from('salas_mensagens').select('*').eq('sala_id', salaId).order('created_at', { ascending: true }).limit(50);
+  const box = document.getElementById('salaChatMsgs');
+  if (box) box.innerHTML = '';
+  (data || []).forEach(m => appendSalaMsg(m, false));
+}
+
+function appendSalaMsg(m, notifyBadge = true) {
+  const box = document.getElementById('salaChatMsgs');
+  if (!box) return;
+  const div = document.createElement('div');
+  div.className = 'sala-msg';
+  div.innerHTML = `<b>${sanitize(m.username || 'Usuário')}:</b> ${sanitize(m.texto)}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  if (notifyBadge && document.getElementById('salaChatPanel')?.classList.contains('hidden')) {
+    const badge = document.getElementById('salaChatBadge');
+    if (badge) { badge.classList.remove('hidden'); badge.textContent = (parseInt(badge.textContent)||0) + 1; }
+  }
+}
+
+async function sendSalaMsg() {
+  if (!currentRoom || !currentUser) return;
+  const input = document.getElementById('salaChatInput');
+  const texto = input.value.trim();
+  if (!texto) return;
+  input.value = '';
+  const { error } = await sb.from('salas_mensagens').insert({ sala_id: currentRoom.id, user_id: currentUser.id, username: currentUser.username, texto: texto.slice(0,300) });
+  if (error) { console.error('sendSalaMsg error:', error); showNotif('❌ Não foi possível enviar a mensagem.', 'error'); }
+}
+
+// Fecha os dropdowns de busca da sala ao clicar fora
+document.addEventListener('click', (e) => {
+  ['salaAnimeDropdown','trocarAnimeDropdown'].forEach(id => {
+    const dd = document.getElementById(id);
+    if (dd && !dd.contains(e.target) && e.target.id !== 'salaAnimeBusca' && e.target.id !== 'trocarAnimeBusca') dd.style.display = 'none';
+  });
+});
 
 // ============================================================
 // DATA
@@ -2554,8 +3046,9 @@ async function renderPlayer(data) {
   // Update prev/next buttons if placeholder controls present
   const prevBtn = document.getElementById('prevEpBtn');
   const nextBtn = document.getElementById('nextEpBtn');
-  if (prevBtn) prevBtn.style.display = movie ? 'none' : '';
-  if (nextBtn) nextBtn.style.display = movie ? 'none' : '';
+  const hideEpNav = movie || !!currentRoom; // em sala, troca de episódio é feita só pelo anfitrião via "Trocar título"
+  if (prevBtn) prevBtn.style.display = hideEpNav ? 'none' : '';
+  if (nextBtn) nextBtn.style.display = hideEpNav ? 'none' : '';
   // Update page title
   document.title = fullTitle + ' — RitiFlix';
   let resumePct = 0;
@@ -2575,8 +3068,8 @@ async function renderPlayer(data) {
   loadVideoUrl(ep.video_url || '', resumePct);
   // After loadVideoUrl, real player may have replaced DOM — re-apply prev/next visibility
   setTimeout(() => {
-    const pb = document.getElementById('prevEpBtn'); if(pb) pb.style.display = movie ? 'none' : '';
-    const nb = document.getElementById('nextEpBtn'); if(nb) nb.style.display = movie ? 'none' : '';
+    const pb = document.getElementById('prevEpBtn'); if(pb) pb.style.display = hideEpNav ? 'none' : '';
+    const nb = document.getElementById('nextEpBtn'); if(nb) nb.style.display = hideEpNav ? 'none' : '';
   }, 50);
   const ci = document.getElementById('commentInput');
   const ncl = document.getElementById('noCommentLogin');
