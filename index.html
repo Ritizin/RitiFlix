@@ -2125,6 +2125,7 @@ async function criarSala() {
     if (maxPessoas) payload.max_pessoas = maxPessoas;
     const { data: row, error } = await sb.from('salas').insert(payload).select().single();
     if (error) throw error;
+    if (!row) { showErr('salaCriarErr', '❌ A sala não foi criada — verifique as permissões (RLS) de INSERT na tabela "salas" no Supabase.'); return; }
     closeModal('criarSala');
     showNotif('🎉 Sala criada! Bom filme :)', 'success');
     enterSala(row, true);
@@ -2171,7 +2172,12 @@ async function confirmSalaSenha() {
     if (errEl) { errEl.textContent = 'Digite a senha da sala.'; errEl.classList.remove('hidden'); }
     return;
   }
-  const { data: sala } = await sb.from('salas').select('*').eq('id', id).maybeSingle();
+  const { data: sala, error: selErr } = await sb.from('salas').select('*').eq('id', id).maybeSingle();
+  if (selErr) {
+    if (errEl) { errEl.textContent = 'Erro ao verificar a sala (permissão/RLS do Supabase). Veja o console.'; errEl.classList.remove('hidden'); }
+    console.error('confirmSalaSenha select error:', selErr);
+    return;
+  }
   if (!sala) {
     if (errEl) { errEl.textContent = 'Sala não encontrada.'; errEl.classList.remove('hidden'); }
     return;
@@ -2330,8 +2336,9 @@ function renderSalaControls() {
 async function salaHostPlay() {
   if (!currentRoom || !currentRoom.isHost) return;
   try {
-    const { error } = await sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id);
+    const { data, error } = await sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).select();
     if (error) throw error;
+    if (!data || !data.length) { showNotif('❌ Não foi possível sincronizar (permissão do Supabase/RLS bloqueou a atualização).', 'error'); return; }
     currentRoom.paused = false;
     renderSalaControls();
     // Carrega o vídeo também para o próprio dono se ainda não carregou
@@ -2347,8 +2354,9 @@ async function salaHostPlay() {
 async function salaHostPause() {
   if (!currentRoom || !currentRoom.isHost) return;
   try {
-    const { error } = await sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id);
+    const { data, error } = await sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id).select();
     if (error) throw error;
+    if (!data || !data.length) { showNotif('❌ Não foi possível sincronizar (permissão do Supabase/RLS bloqueou a atualização).', 'error'); return; }
     currentRoom.paused = true;
     renderSalaControls();
     // Broadcast de pause para membros via canal Realtime
@@ -2407,8 +2415,9 @@ async function deletarSala(id) {
   try {
     // Tenta excluir mensagens (pode falhar se RLS não permitir — não bloqueia)
     try { await sb.from('salas_mensagens').delete().eq('sala_id', id); } catch(e) {}
-    const { error } = await sb.from('salas').delete().eq('id', id);
+    const { data, error } = await sb.from('salas').delete().eq('id', id).select();
     if (error) throw error;
+    if (!data || !data.length) { showNotif('❌ A sala não foi excluída — verifique as permissões (RLS) de DELETE na tabela "salas" no Supabase.', 'error'); return; }
     showNotif('🗑️ Sala excluída.', 'success');
     if (currentRoom && currentRoom.id === id) {
       if (_salaChannel) { try { sb.removeChannel(_salaChannel); } catch(e){} _salaChannel = null; }
@@ -2430,9 +2439,20 @@ async function abrirEditarSala(id) {
   if (sala.host_id !== currentUser.id && currentUser.role !== 'admin') { showNotif('❌ Sem permissão.', 'error'); return; }
   _resetCriarSalaModal();
   window._editandoSalaId = id;
+  window._editandoSalaTinhaSenha = !!sala.senha_hash;
   document.getElementById('salaNome').value = sala.nome;
   const maxEl = document.getElementById('salaMaxPessoas');
   if (maxEl) maxEl.value = sala.max_pessoas || '';
+  // Reflete se a sala já tem senha — deixa o campo vazio (não revela a senha atual);
+  // se o dono digitar algo, troca a senha; se deixar vazio e manter o toggle ligado, mantém a senha atual.
+  const senhaToggle = document.getElementById('salaSenhaToggle');
+  const senhaGroup  = document.getElementById('salaSenhaGroup');
+  const senhaInput  = document.getElementById('salaSenha');
+  if (sala.senha_hash) {
+    senhaToggle.classList.add('on');
+    senhaGroup.classList.remove('hidden');
+    if (senhaInput) senhaInput.placeholder = 'Deixe em branco para manter a senha atual';
+  }
   const span = document.querySelector('#modal-criarSala .modal-logo span');
   if (span) span.textContent = '✏️ Editar Sala';
   const btn = document.getElementById('salaCriarBtn');
@@ -2456,14 +2476,22 @@ async function salvarEdicaoSala() {
   const maxRaw = parseInt(document.getElementById('salaMaxPessoas')?.value || '');
   const maxPessoas = isNaN(maxRaw) || maxRaw < 2 ? null : Math.min(maxRaw, 50);
   if (!nome || nome.length < 3) { showFieldError('salaNome','salaNomeErr','Digite um nome com pelo menos 3 caracteres.'); return; }
+  if (protegida && !window._editandoSalaTinhaSenha && senha.length < 4) { showFieldError('salaSenha','salaSenhaErr','A senha precisa ter pelo menos 4 caracteres.'); return; }
   const btn = document.getElementById('salaCriarBtn');
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
     const upd = { nome, max_pessoas: maxPessoas };
     if (escolhido) { upd.anime_id = escolhido.id; upd.ep_id = escolhido.ep_id; }
-    if (protegida && senha.length >= 4) upd.senha_hash = await sha256Hex(senha);
-    const { error } = await sb.from('salas').update(upd).eq('id', id);
+    if (protegida) {
+      // Toggle ligado: se digitou senha nova, troca; se deixou em branco, mantém a senha atual (não altera).
+      if (senha.length >= 4) upd.senha_hash = await sha256Hex(senha);
+    } else {
+      // Toggle desligado: remove a proteção por senha da sala.
+      upd.senha_hash = null;
+    }
+    const { data, error } = await sb.from('salas').update(upd).eq('id', id).select();
     if (error) throw error;
+    if (!data || !data.length) { showErr('salaCriarErr', '❌ A sala não foi atualizada — verifique as permissões (RLS) de UPDATE na tabela "salas" no Supabase.'); return; }
     closeModal('criarSala');
     showNotif('✅ Sala atualizada!', 'success');
     _resetCriarSalaModal();
