@@ -603,18 +603,19 @@ input:focus~.search-kbd,.search-wrap input:focus~.search-kbd{opacity:0}
 .toggle-switch .knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:all .2s}
 .toggle-switch.on .knob{left:24px}
 @media(max-width:480px){.sala-chat-panel{right:.6rem;left:.6rem;width:auto;bottom:5.25rem}.sala-chat-fab{right:1rem;bottom:1rem}}
-/* SALA CONTROLS */
-.sala-ctrl-bar{display:flex;align-items:center;gap:.75rem;background:linear-gradient(90deg,rgba(201,168,76,0.12),rgba(201,168,76,0.03));border:1px solid rgba(201,168,76,0.3);border-radius:12px;padding:.6rem 1rem;margin-top:.5rem;flex-wrap:wrap}
-.sala-ctrl-bar .ctrl-label{font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
-.sala-ctrl-btn{padding:.4rem .85rem;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;border:none;font-family:'Outfit',sans-serif;transition:all .2s;display:inline-flex;align-items:center;gap:.35rem}
+/* SALA CONTROLS BAR */
+.sala-ctrl-bar{display:flex;align-items:center;gap:.75rem;background:linear-gradient(90deg,rgba(201,168,76,0.1),rgba(201,168,76,0.02));border:1px solid rgba(201,168,76,0.28);border-radius:12px;padding:.6rem 1rem;margin-top:.5rem;flex-wrap:wrap}
+.sala-ctrl-label{font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap}
+.sala-ctrl-btn{padding:.4rem .9rem;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;border:none;font-family:'Outfit',sans-serif;transition:all .2s;display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap}
 .sala-ctrl-play{background:var(--grad);color:#07090f}
-.sala-ctrl-play:hover{opacity:.9;box-shadow:var(--glow)}
-.sala-ctrl-pause{background:rgba(255,255,255,0.08);color:var(--text);border:1px solid var(--border)}
-.sala-ctrl-pause:hover{background:rgba(255,255,255,0.14)}
-.sala-sync-badge{font-size:.7rem;color:var(--gold);background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);padding:.2rem .55rem;border-radius:5px;white-space:nowrap}
-.sala-member-count{font-size:.78rem;color:var(--text2);display:flex;align-items:center;gap:.3rem;white-space:nowrap}
-.sala-full-badge{font-size:.68rem;color:#f87171;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);padding:.2rem .55rem;border-radius:5px}
+.sala-ctrl-play:hover{opacity:.9;transform:translateY(-1px);box-shadow:var(--glow)}
+.sala-ctrl-pause{background:rgba(255,255,255,0.06);color:var(--text);border:1px solid var(--border)}
+.sala-ctrl-pause:hover{background:rgba(255,255,255,0.11)}
+.sala-status-badge{font-size:.72rem;padding:.25rem .6rem;border-radius:5px;font-weight:700;white-space:nowrap}
+.sala-status-live{color:#4ade80;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25)}
+.sala-status-paused{color:#fbbf24;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.25)}
 .sala-card-info .sc{font-size:.7rem;color:var(--text3);margin-top:.1rem}
+.sala-full-badge{font-size:.68rem;color:#f87171;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);padding:.2rem .5rem;border-radius:5px}
 @media(max-width:480px){
   .stats-grid{grid-template-columns:1fr 1fr}
   .hero-title{font-size:1.7rem}
@@ -1230,9 +1231,8 @@ document.addEventListener('DOMContentLoaded', function() {
       <select class="form-select" id="salaEpSelect"></select>
     </div>
     <div class="form-group">
-      <label class="form-label">👥 Máx. de pessoas na sala</label>
-      <input type="number" class="form-input" id="salaMaxPessoas" placeholder="Ex: 4 (deixe vazio para ilimitado)" min="2" max="50">
-      <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Deixe em branco para não ter limite.</div>
+      <label class="form-label">👥 Limite de pessoas <span style="color:var(--text3);font-weight:400;font-size:.72rem">(opcional)</span></label>
+      <input type="number" class="form-input" id="salaMaxPessoas" placeholder="Deixe vazio para ilimitado" min="2" max="50">
     </div>
     <div class="form-group">
       <div class="toggle-row">
@@ -1949,7 +1949,13 @@ function navigate(page, filter) {
 // SALAS / WATCH PARTY
 // ============================================================
 // Tabelas Supabase necessárias: "salas" e "salas_mensagens".
-// Veja o arquivo salas_setup.sql para o script de criação completo.
+// Colunas extras necessárias na tabela "salas":
+//   max_pessoas    int (nullable)
+//   membros_count  int default 1
+//   sala_paused    boolean default true
+// SQL: ALTER TABLE salas ADD COLUMN IF NOT EXISTS max_pessoas int;
+//      ALTER TABLE salas ADD COLUMN IF NOT EXISTS membros_count int DEFAULT 1;
+//      ALTER TABLE salas ADD COLUMN IF NOT EXISTS sala_paused boolean DEFAULT true;
 
 async function sha256Hex(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -1967,8 +1973,7 @@ async function renderSalas(q) {
   if (!grid) return;
   grid.innerHTML = '<div class="salas-empty">Carregando salas...</div>';
   try {
-    let query = sb.from('salas').select('*, animes(title,emoji,poster,type,genres)').eq('ativa', true).order('created_at', { ascending: false });
-    const { data: salas, error } = await query;
+    const { data: salas, error } = await sb.from('salas').select('*, animes(title,emoji,poster,type,genres)').eq('ativa', true).order('created_at', { ascending: false });
     if (error) throw error;
     let list = salas || [];
     const term = (q || document.getElementById('salasSearchInput')?.value || '').trim().toLowerCase();
@@ -1989,28 +1994,28 @@ function salaCardHTML(s) {
   const isMovie = a.type === 'filme' || (!a.type && (a.genres||[]).includes('Filme'));
   const isFull = s.max_pessoas && (s.membros_count || 0) >= s.max_pessoas;
   const isOwner = currentUser && currentUser.id === s.host_id;
-  const isAdmin = currentUser && currentUser.role === 'admin';
-  const canManage = isOwner || isAdmin;
-  return `<div class="sala-card" onclick="${isFull && !canManage ? "showNotif('❌ Sala lotada!','error')" : `joinSala(${s.id})`}">
+  const isAdm   = currentUser && currentUser.role === 'admin';
+  const canManage = isOwner || isAdm;
+  return `<div class="sala-card" onclick="joinSala(${s.id})">
     <div class="sala-card-img">
       ${a.poster ? `<img src="${a.poster}" loading="lazy">` : `<span>${a.emoji||'🎬'}</span>`}
       ${s.senha_hash ? '<span class="sala-lock">🔒 Privada</span>' : ''}
-      ${isFull ? '<span class="sala-lock" style="background:rgba(248,113,113,0.8);border-color:rgba(248,113,113,0.5);color:#fff">🚫 Lotada</span>' : ''}
+      ${isFull && !canManage ? '<span class="sala-lock" style="background:rgba(248,113,113,0.85);border-color:rgba(248,113,113,0.4);color:#fff;top:auto;bottom:.5rem">🚫 Lotada</span>' : ''}
     </div>
     <div class="sala-card-info">
       <div class="sn">${sanitize(s.nome)}</div>
       <div class="sm">${sanitize(a.title || 'Título removido')} ${isMovie?'• 🎬 Filme':'• 📺 Série'}</div>
-      <div class="sh">👑 Anfitrião: ${sanitize(s.host_nome || '—')}</div>
-      ${s.max_pessoas ? `<div class="sc">👥 ${s.membros_count||0}/${s.max_pessoas} pessoas</div>` : ''}
+      <div class="sh">👑 Dono: ${sanitize(s.host_nome || '—')}</div>
+      ${s.max_pessoas ? `<div class="sc">👥 ${s.membros_count||0}/${s.max_pessoas} pessoas${isFull?' • 🚫 Lotada':''}</div>` : ''}
       ${canManage ? `<div style="display:flex;gap:.4rem;margin-top:.5rem" onclick="event.stopPropagation()">
-        <button class="td-btn td-edit" style="font-size:.7rem;padding:.3rem .6rem" onclick="abrirEditarSala(${s.id})">✏️ Editar</button>
-        <button class="td-btn td-del" style="font-size:.7rem;padding:.3rem .6rem" onclick="deletarSala(${s.id})">🗑️ Excluir</button>
+        <button class="td-btn td-edit" style="font-size:.7rem;padding:.3rem .6rem" onclick="event.stopPropagation();abrirEditarSala(${s.id})">✏️ Editar</button>
+        <button class="td-btn td-del"  style="font-size:.7rem;padding:.3rem .6rem" onclick="event.stopPropagation();deletarSala(${s.id})">🗑️ Excluir</button>
       </div>` : ''}
     </div>
   </div>`;
 }
 
-// ── Mini-busca de catálogo (usada nos modais Criar Sala e Trocar Título) ──
+// ── Mini-busca de catálogo (Criar Sala / Trocar Título) ──
 let _salaSearchDebounce;
 function searchSalaAnime(q, ctx) {
   clearTimeout(_salaSearchDebounce);
@@ -2042,7 +2047,7 @@ async function selectSalaAnime(anime, ctx) {
     preview.classList.remove('hidden');
     preview.innerHTML = `${anime.poster ? `<img src="${anime.poster}" style="width:34px;height:48px;object-fit:cover;border-radius:5px">` : `<span style="font-size:1.5rem">${anime.emoji}</span>`}<span>✓ <strong>${sanitize(anime.title)}</strong></span>`;
   }
-  const epGroup = document.getElementById(ctx === 'trocar' ? 'trocarEpGroup' : 'salaEpGroup');
+  const epGroup  = document.getElementById(ctx === 'trocar' ? 'trocarEpGroup'  : 'salaEpGroup');
   const epSelect = document.getElementById(ctx === 'trocar' ? 'trocarEpSelect' : 'salaEpSelect');
   if (!epGroup || !epSelect) return;
   if (isMovie) {
@@ -2070,8 +2075,8 @@ function toggleSalaSenha() {
   if (!t.classList.contains('on')) document.getElementById('salaSenha').value = '';
 }
 
-function openCriarSalaModal() {
-  if (!currentUser) { showNotif('❌ Faça login para criar uma sala.', 'error'); openModal('login'); return; }
+// ── Resetar modal de criar sala para o estado padrão ──
+function _resetCriarSalaModal() {
   document.getElementById('salaNome').value = '';
   document.getElementById('salaAnimeBusca').value = '';
   document.getElementById('salaAnimePreview').classList.add('hidden');
@@ -2079,12 +2084,18 @@ function openCriarSalaModal() {
   document.getElementById('salaSenha').value = '';
   document.getElementById('salaSenhaGroup').classList.add('hidden');
   document.getElementById('salaSenhaToggle').classList.remove('on');
-  document.getElementById('salaMaxPessoas').value = '';
+  const maxEl = document.getElementById('salaMaxPessoas'); if (maxEl) maxEl.value = '';
   window._salaSelected.criar = null;
   window._editandoSalaId = null;
-  document.getElementById('modal-criarSala').querySelector('.modal-logo span').textContent = '🎉 Criar Sala';
-  document.getElementById('salaCriarBtn').textContent = 'Criar e entrar na sala';
-  document.getElementById('salaCriarBtn').onclick = criarSala;
+  const span = document.querySelector('#modal-criarSala .modal-logo span');
+  if (span) span.textContent = '🎉 Criar Sala';
+  const btn = document.getElementById('salaCriarBtn');
+  if (btn) { btn.textContent = 'Criar e entrar na sala'; btn.onclick = criarSala; }
+}
+
+function openCriarSalaModal() {
+  if (!currentUser) { showNotif('❌ Faça login para criar uma sala.', 'error'); openModal('login'); return; }
+  _resetCriarSalaModal();
   openModal('criarSala');
 }
 
@@ -2094,29 +2105,32 @@ async function criarSala() {
   const escolhido = window._salaSelected.criar;
   const protegida = document.getElementById('salaSenhaToggle').classList.contains('on');
   const senha = document.getElementById('salaSenha').value;
-  const maxPessoasRaw = parseInt(document.getElementById('salaMaxPessoas').value);
-  const maxPessoas = isNaN(maxPessoasRaw) || maxPessoasRaw < 2 ? null : Math.min(maxPessoasRaw, 50);
+  const maxRaw = parseInt(document.getElementById('salaMaxPessoas')?.value || '');
+  const maxPessoas = isNaN(maxRaw) || maxRaw < 2 ? null : Math.min(maxRaw, 50);
   let ok = true;
   if (!nome || nome.length < 3) { showFieldError('salaNome','salaNomeErr','Digite um nome com pelo menos 3 caracteres.'); ok = false; }
-  if (!escolhido) { showErr('salaAnimeErr','Escolha um filme ou série do catálogo.'); ok = false; }
+  if (!escolhido)                { showErr('salaAnimeErr','Escolha um filme ou série do catálogo.'); ok = false; }
   if (protegida && senha.length < 4) { showFieldError('salaSenha','salaSenhaErr','A senha precisa ter pelo menos 4 caracteres.'); ok = false; }
   if (!ok) return;
   const btn = document.getElementById('salaCriarBtn');
   btn.disabled = true; btn.textContent = 'Criando...';
   try {
     const senhaHash = protegida ? await sha256Hex(senha) : null;
-    const { data: row, error } = await sb.from('salas').insert({
-      nome, senha_hash: senhaHash, anime_id: escolhido.id, ep_id: escolhido.ep_id,
-      host_id: currentUser.id, host_nome: currentUser.username, ativa: true,
-      max_pessoas: maxPessoas, membros_count: 1, sala_paused: true
-    }).select().single();
+    const payload = {
+      nome, senha_hash: senhaHash,
+      anime_id: escolhido.id, ep_id: escolhido.ep_id,
+      host_id: currentUser.id, host_nome: currentUser.username,
+      ativa: true, sala_paused: true, membros_count: 1
+    };
+    if (maxPessoas) payload.max_pessoas = maxPessoas;
+    const { data: row, error } = await sb.from('salas').insert(payload).select().single();
     if (error) throw error;
     closeModal('criarSala');
     showNotif('🎉 Sala criada! Bom filme :)', 'success');
     enterSala(row, true);
   } catch(e) {
     console.error('criarSala error:', e);
-    showErr('salaCriarErr', '❌ Não foi possível criar a sala. Verifique se a tabela "salas" existe no Supabase e tem as colunas max_pessoas, membros_count, sala_paused.');
+    showErr('salaCriarErr', '❌ Não foi possível criar a sala. Verifique se a tabela "salas" existe no Supabase e tem as colunas: max_pessoas, membros_count, sala_paused.');
   } finally {
     btn.disabled = false; btn.textContent = 'Criar e entrar na sala';
   }
@@ -2127,16 +2141,21 @@ async function joinSala(id) {
   const { data: sala, error } = await sb.from('salas').select('*').eq('id', id).eq('ativa', true).maybeSingle();
   if (error || !sala) { showNotif('❌ Essa sala não existe mais.', 'error'); renderSalas(); return; }
   const isOwner = sala.host_id === currentUser.id;
-  const isAdmin = currentUser.role === 'admin';
-  // Verifica lotação (dono e admin entram mesmo assim)
-  if (sala.max_pessoas && !isOwner && !isAdmin) {
-    const count = sala.membros_count || 0;
-    if (count >= sala.max_pessoas) { showNotif('❌ Sala lotada! Máximo de ' + sala.max_pessoas + ' pessoas.', 'error'); return; }
+  const isAdm   = currentUser.role === 'admin';
+  // Verifica lotação — dono e admin sempre entram
+  if (sala.max_pessoas && !isOwner && !isAdm) {
+    if ((sala.membros_count || 0) >= sala.max_pessoas) {
+      showNotif(`❌ Sala lotada! Máximo de ${sala.max_pessoas} pessoa(s).`, 'error');
+      return;
+    }
   }
-  if (sala.senha_hash && !isOwner && !isAdmin) {
+  // Verifica senha — dono e admin entram sem senha
+  if (sala.senha_hash && !isOwner && !isAdm) {
     window._pendingSalaId = id;
     document.getElementById('senhaSalaNome').textContent = sanitize(sala.nome);
     document.getElementById('senhaSalaInput').value = '';
+    const errEl = document.getElementById('senhaSalaErr');
+    if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
     openModal('senhaSala');
     return;
   }
@@ -2144,23 +2163,41 @@ async function joinSala(id) {
 }
 
 async function confirmSalaSenha() {
-  clearFormErrors('senhaSala');
-  const id = window._pendingSalaId;
+  const id  = window._pendingSalaId;
   const val = document.getElementById('senhaSalaInput').value;
-  if (!val || val.length < 4) { showFieldError('senhaSalaInput','senhaSalaErr','Digite a senha da sala.'); return; }
+  const errEl = document.getElementById('senhaSalaErr');
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+  if (!val || val.length < 1) {
+    if (errEl) { errEl.textContent = 'Digite a senha da sala.'; errEl.classList.remove('hidden'); }
+    return;
+  }
   const { data: sala } = await sb.from('salas').select('*').eq('id', id).maybeSingle();
-  if (!sala) { showErr('senhaSalaErr', 'Sala não encontrada.'); return; }
+  if (!sala) {
+    if (errEl) { errEl.textContent = 'Sala não encontrada.'; errEl.classList.remove('hidden'); }
+    return;
+  }
   const hash = await sha256Hex(val);
-  if (hash !== sala.senha_hash) { showFieldError('senhaSalaInput','senhaSalaErr','Senha incorreta.'); return; }
+  if (hash !== sala.senha_hash) {
+    if (errEl) { errEl.textContent = 'Senha incorreta. Tente novamente.'; errEl.classList.remove('hidden'); }
+    document.getElementById('senhaSalaInput').value = '';
+    return;
+  }
   closeModal('senhaSala');
   enterSala(sala, false);
 }
 
 async function enterSala(sala, isHost) {
-  currentRoom = { id: sala.id, nome: sala.nome, host_id: sala.host_id, anime_id: sala.anime_id, ep_id: sala.ep_id, isHost: !!isHost, paused: sala.sala_paused !== false };
-  // Incrementa contagem de membros
+  currentRoom = {
+    id: sala.id, nome: sala.nome, host_id: sala.host_id,
+    anime_id: sala.anime_id, ep_id: sala.ep_id,
+    isHost: !!isHost,
+    paused: sala.sala_paused !== false   // começa pausado por padrão
+  };
+  // Incrementa contagem de membros para não-donos
   if (!isHost) {
-    try { await sb.from('salas').update({ membros_count: Math.max(1, (sala.membros_count||0)+1) }).eq('id', sala.id); } catch(e){}
+    try {
+      await sb.from('salas').update({ membros_count: Math.max(1, (sala.membros_count||1)+1) }).eq('id', sala.id);
+    } catch(e) {}
   }
   navigate('player', { animeId: sala.anime_id, epId: sala.ep_id, salaId: sala.id });
   const bar = document.getElementById('salaTopBar');
@@ -2173,8 +2210,8 @@ async function enterSala(sala, isHost) {
   document.getElementById('salaChatMsgs').innerHTML = '';
   subscribeSala(sala.id);
   loadSalaMsgsHistory(sala.id);
-  // Mostra barra de controles do host
-  setTimeout(() => renderSalaControls(), 200);
+  // Renderiza barra de controles depois que o player carregar
+  setTimeout(renderSalaControls, 300);
 }
 
 function subscribeSala(id) {
@@ -2184,6 +2221,25 @@ function subscribeSala(id) {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'salas', filter: 'id=eq.'+id }, payload => onSalaUpdate(payload.new))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'salas_mensagens', filter: 'sala_id=eq.'+id }, payload => appendSalaMsg(payload.new))
     .on('presence', { event: 'sync' }, () => updateSalaViewerCount())
+    // Broadcast de play/pause (fallback se postgres_changes não chegar)
+    .on('broadcast', { event: 'sala_play' }, () => {
+      if (currentRoom && !currentRoom.isHost) {
+        if (currentRoom.paused !== false) {
+          currentRoom.paused = false;
+          renderSalaControls();
+          _memberApplyPlay();
+        }
+      }
+    })
+    .on('broadcast', { event: 'sala_pause' }, () => {
+      if (currentRoom && !currentRoom.isHost) {
+        if (currentRoom.paused !== true) {
+          currentRoom.paused = true;
+          renderSalaControls();
+          _memberApplyPause();
+        }
+      }
+    })
     .subscribe(status => {
       if (status === 'SUBSCRIBED' && currentUser) {
         _salaChannel.track({ username: currentUser.username });
@@ -2201,22 +2257,23 @@ function updateSalaViewerCount() {
 
 function onSalaUpdate(newRow) {
   if (!currentRoom || newRow.id !== currentRoom.id) return;
-  // Troca de título — qualquer membro recebe
+  // Troca de título — só membros recebem (host já aplicou localmente)
   if (!currentRoom.isHost && (newRow.ep_id !== currentRoom.ep_id || newRow.anime_id !== currentRoom.anime_id)) {
-    currentRoom.anime_id = newRow.anime_id; currentRoom.ep_id = newRow.ep_id;
+    currentRoom.anime_id = newRow.anime_id;
+    currentRoom.ep_id    = newRow.ep_id;
     showNotif('🔄 O anfitrião trocou o título da sala.', 'success');
     renderPlayer({ animeId: newRow.anime_id, epId: newRow.ep_id, salaId: newRow.id });
   }
-  // Play/pause sincronizado (não aplica no próprio host)
-  if (!currentRoom.isHost && newRow.sala_paused !== undefined) {
-    const wasPaused = currentRoom.paused;
-    currentRoom.paused = !!newRow.sala_paused;
-    if (wasPaused !== currentRoom.paused) {
+  // Play / Pause via postgres_changes — só membros recebem
+  if (!currentRoom.isHost && newRow.sala_paused !== undefined && newRow.sala_paused !== null) {
+    const novoPaused = !!newRow.sala_paused;
+    if (novoPaused !== currentRoom.paused) {
+      currentRoom.paused = novoPaused;
       renderSalaControls();
-      if (currentRoom.paused) {
-        showNotif('⏸ O anfitrião pausou para todos.', 'success');
+      if (novoPaused) {
+        _memberApplyPause();
       } else {
-        showNotif('▶ O anfitrião deu play para todos!', 'success');
+        _memberApplyPlay();
       }
     }
   }
@@ -2224,28 +2281,26 @@ function onSalaUpdate(newRow) {
 
 async function leaveSala(showMsg = true) {
   if (!currentRoom) return;
-  // Decrementa contagem de membros (exceto host, que já está como 1 no início)
+  // Decrementa contagem de membros para não-donos
   if (!currentRoom.isHost) {
     try {
       const { data: s } = await sb.from('salas').select('membros_count').eq('id', currentRoom.id).maybeSingle();
-      if (s) await sb.from('salas').update({ membros_count: Math.max(0, (s.membros_count||1)-1) }).eq('id', currentRoom.id);
-    } catch(e){}
+      if (s) await sb.from('salas').update({ membros_count: Math.max(1, (s.membros_count||1)-1) }).eq('id', currentRoom.id);
+    } catch(e) {}
   }
   if (_salaChannel) { try { sb.removeChannel(_salaChannel); } catch(e){} _salaChannel = null; }
   currentRoom = null;
   document.getElementById('salaTopBar')?.classList.add('hidden');
   document.getElementById('salaChatFab')?.classList.add('hidden');
   document.getElementById('salaChatPanel')?.classList.add('hidden');
-  // Remove barra de controles
   const ctrlBar = document.getElementById('salaCtrlBar');
   if (ctrlBar) ctrlBar.remove();
   if (showMsg) { showNotif('👋 Você saiu da sala.', 'success'); navigate('salas'); }
 }
 
-// ── Controles de play/pause da sala (host controla todos) ──
+// ── Controles de play/pause (host controla todos via Supabase Realtime) ──
 function renderSalaControls() {
   if (!currentRoom) return;
-  // Remove barra anterior se existir
   const old = document.getElementById('salaCtrlBar');
   if (old) old.remove();
   const topBar = document.getElementById('salaTopBar');
@@ -2256,18 +2311,18 @@ function renderSalaControls() {
   if (currentRoom.isHost) {
     const isPaused = currentRoom.paused !== false;
     bar.innerHTML = `
-      <span class="ctrl-label">👑 Você é o dono:</span>
+      <span class="sala-ctrl-label">👑 Você é o dono:</span>
       ${isPaused
-        ? `<button class="sala-ctrl-btn sala-ctrl-play" onclick="salaHostPlay()">▶ Play para todos</button>`
+        ? `<button class="sala-ctrl-btn sala-ctrl-play"  onclick="salaHostPlay()">▶ Play para todos</button>`
         : `<button class="sala-ctrl-btn sala-ctrl-pause" onclick="salaHostPause()">⏸ Pausar para todos</button>`
       }
-      <span class="sala-sync-badge">🔴 AO VIVO</span>`;
+      <span class="sala-status-badge ${isPaused ? 'sala-status-paused' : 'sala-status-live'}">${isPaused ? '⏸ Pausado' : '▶ Ao vivo'}</span>`;
   } else {
     const isPaused = currentRoom.paused !== false;
     bar.innerHTML = `
-      <span class="ctrl-label">Sala:</span>
-      <span class="sala-sync-badge">${isPaused ? '⏸ Pausado pelo anfitrião' : '▶ Reproduzindo'}</span>
-      <span style="font-size:.75rem;color:var(--text3)">Apenas o anfitrião controla o play/pause.</span>`;
+      <span class="sala-ctrl-label">Sala:</span>
+      <span class="sala-status-badge ${isPaused ? 'sala-status-paused' : 'sala-status-live'}">${isPaused ? '⏸ Pausado pelo anfitrião' : '▶ Reproduzindo'}</span>
+      <span style="font-size:.75rem;color:var(--text3)">Só o dono controla o play/pause.</span>`;
   }
   topBar.insertAdjacentElement('afterend', bar);
 }
@@ -2275,35 +2330,96 @@ function renderSalaControls() {
 async function salaHostPlay() {
   if (!currentRoom || !currentRoom.isHost) return;
   try {
-    await sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id);
+    const { error } = await sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id);
+    if (error) throw error;
     currentRoom.paused = false;
     renderSalaControls();
+    // Carrega o vídeo também para o próprio dono se ainda não carregou
+    _hostLoadVideo();
+    // Broadcast para membros via canal Realtime (fallback além do postgres_changes)
+    if (_salaChannel) {
+      _salaChannel.send({ type: 'broadcast', event: 'sala_play', payload: { ep_id: currentEpId, anime_id: currentAnimeId } }).catch(()=>{});
+    }
     showNotif('▶ Play enviado para todos!', 'success');
-  } catch(e) { showNotif('❌ Erro ao sincronizar.', 'error'); }
+  } catch(e) { console.error('salaHostPlay:', e); showNotif('❌ Erro ao sincronizar.', 'error'); }
 }
 
 async function salaHostPause() {
   if (!currentRoom || !currentRoom.isHost) return;
   try {
-    await sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id);
+    const { error } = await sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id);
+    if (error) throw error;
     currentRoom.paused = true;
     renderSalaControls();
+    // Broadcast de pause para membros via canal Realtime
+    if (_salaChannel) {
+      _salaChannel.send({ type: 'broadcast', event: 'sala_pause', payload: {} }).catch(()=>{});
+    }
     showNotif('⏸ Pausado para todos!', 'success');
-  } catch(e) { showNotif('❌ Erro ao sincronizar.', 'error'); }
+  } catch(e) { console.error('salaHostPause:', e); showNotif('❌ Erro ao sincronizar.', 'error'); }
 }
 
-// ── Deletar sala (dono ou admin) ──
+function _hostLoadVideo() {
+  // Carrega o vídeo no player do host
+  if (!currentRoom || !currentRoom.isHost) return;
+  currentRoom.paused = false; // marca como não-pausado para renderPlayer não bloquear
+  const epId = currentEpId || currentRoom.ep_id;
+  if (!epId) return;
+  sb.from('episodes').select('video_url').eq('id', epId).single().then(({ data: ep }) => {
+    if (ep && ep.video_url) loadVideoUrl(ep.video_url, 0);
+  }).catch(()=>{});
+}
+
+function _memberApplyPlay() {
+  // Chamado quando o dono dá play — carrega vídeo para o membro
+  showNotif('▶ O anfitrião deu play para todos!', 'success');
+  const epId = currentEpId || currentRoom?.ep_id;
+  if (!epId) return;
+  sb.from('episodes').select('video_url').eq('id', epId).single().then(({ data: ep }) => {
+    if (ep && ep.video_url) loadVideoUrl(ep.video_url, 0);
+  }).catch(()=>{});
+}
+
+function _memberApplyPause() {
+  // Chamado quando o dono pausa — exibe tela de espera para o membro
+  showNotif('⏸ O anfitrião pausou para todos.', 'success');
+  const container = document.getElementById('videoPlayer');
+  if (container) {
+    container.style.aspectRatio = '16/9';
+    container.style.height = '';
+    container.innerHTML = `<div class="player-inner" id="playerContent" style="display:flex">
+      <div style="font-size:3rem;margin-bottom:.5rem">⏸</div>
+      <div style="font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.4rem">Pausado pelo anfitrião</div>
+      <div style="font-size:.82rem;color:var(--text3);text-align:center;max-width:320px;line-height:1.6">
+        Aguardando o dono dar <strong style="color:var(--gold)">▶ Play</strong> novamente.
+      </div>
+    </div>`;
+  }
+}
+
+// ── Excluir sala (dono ou admin) ──
 async function deletarSala(id) {
   if (!currentUser) return;
   const { data: sala } = await sb.from('salas').select('host_id,nome').eq('id', id).maybeSingle();
   if (!sala) { showNotif('❌ Sala não encontrada.', 'error'); return; }
   if (sala.host_id !== currentUser.id && currentUser.role !== 'admin') { showNotif('❌ Sem permissão.', 'error'); return; }
   if (!confirm(`Excluir a sala "${sala.nome}" permanentemente?`)) return;
-  await sb.from('salas_mensagens').delete().eq('sala_id', id);
-  await sb.from('salas').delete().eq('id', id);
-  showNotif('🗑️ Sala excluída.', 'success');
-  if (currentRoom && currentRoom.id === id) { currentRoom = null; document.getElementById('salaTopBar')?.classList.add('hidden'); }
-  renderSalas();
+  try {
+    // Tenta excluir mensagens (pode falhar se RLS não permitir — não bloqueia)
+    try { await sb.from('salas_mensagens').delete().eq('sala_id', id); } catch(e) {}
+    const { error } = await sb.from('salas').delete().eq('id', id);
+    if (error) throw error;
+    showNotif('🗑️ Sala excluída.', 'success');
+    if (currentRoom && currentRoom.id === id) {
+      if (_salaChannel) { try { sb.removeChannel(_salaChannel); } catch(e){} _salaChannel = null; }
+      currentRoom = null;
+      document.getElementById('salaTopBar')?.classList.add('hidden');
+      document.getElementById('salaChatFab')?.classList.add('hidden');
+      document.getElementById('salaChatPanel')?.classList.add('hidden');
+      const cb = document.getElementById('salaCtrlBar'); if (cb) cb.remove();
+    }
+    renderSalas();
+  } catch(e) { console.error('deletarSala:', e); showNotif('❌ Erro ao excluir sala: ' + (e.message || e), 'error'); }
 }
 
 // ── Editar sala (dono ou admin) ──
@@ -2312,26 +2428,20 @@ async function abrirEditarSala(id) {
   const { data: sala } = await sb.from('salas').select('*').eq('id', id).maybeSingle();
   if (!sala) { showNotif('❌ Sala não encontrada.', 'error'); return; }
   if (sala.host_id !== currentUser.id && currentUser.role !== 'admin') { showNotif('❌ Sem permissão.', 'error'); return; }
+  _resetCriarSalaModal();
   window._editandoSalaId = id;
-  // Preenche modal de criar sala como editor
   document.getElementById('salaNome').value = sala.nome;
-  document.getElementById('salaAnimeBusca').value = '';
-  document.getElementById('salaAnimePreview').classList.add('hidden');
-  document.getElementById('salaEpGroup').classList.add('hidden');
-  document.getElementById('salaSenha').value = '';
-  document.getElementById('salaSenhaGroup').classList.add('hidden');
-  document.getElementById('salaSenhaToggle').classList.remove('on');
-  document.getElementById('salaMaxPessoas').value = sala.max_pessoas || '';
+  const maxEl = document.getElementById('salaMaxPessoas');
+  if (maxEl) maxEl.value = sala.max_pessoas || '';
+  const span = document.querySelector('#modal-criarSala .modal-logo span');
+  if (span) span.textContent = '✏️ Editar Sala';
+  const btn = document.getElementById('salaCriarBtn');
+  if (btn) { btn.textContent = 'Salvar alterações'; btn.onclick = salvarEdicaoSala; }
   window._salaSelected.criar = { id: sala.anime_id, ep_id: sala.ep_id };
-  // Busca nome do anime atual
   if (sala.anime_id) {
     const { data: a } = await sb.from('animes').select('id,title,emoji,poster,type,genres').eq('id', sala.anime_id).maybeSingle();
     if (a) selectSalaAnime(a, 'criar');
   }
-  const modal = document.getElementById('modal-criarSala');
-  modal.querySelector('.modal-logo span').textContent = '✏️ Editar Sala';
-  document.getElementById('salaCriarBtn').textContent = 'Salvar alterações';
-  document.getElementById('salaCriarBtn').onclick = salvarEdicaoSala;
   openModal('criarSala');
 }
 
@@ -2343,32 +2453,30 @@ async function salvarEdicaoSala() {
   const escolhido = window._salaSelected.criar;
   const protegida = document.getElementById('salaSenhaToggle').classList.contains('on');
   const senha = document.getElementById('salaSenha').value;
-  const maxPessoasRaw = parseInt(document.getElementById('salaMaxPessoas').value);
-  const maxPessoas = isNaN(maxPessoasRaw) || maxPessoasRaw < 2 ? null : Math.min(maxPessoasRaw, 50);
-  let ok = true;
-  if (!nome || nome.length < 3) { showFieldError('salaNome','salaNomeErr','Digite um nome com pelo menos 3 caracteres.'); ok = false; }
-  if (!ok) return;
+  const maxRaw = parseInt(document.getElementById('salaMaxPessoas')?.value || '');
+  const maxPessoas = isNaN(maxRaw) || maxRaw < 2 ? null : Math.min(maxRaw, 50);
+  if (!nome || nome.length < 3) { showFieldError('salaNome','salaNomeErr','Digite um nome com pelo menos 3 caracteres.'); return; }
   const btn = document.getElementById('salaCriarBtn');
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
-    const updateData = { nome, max_pessoas: maxPessoas };
-    if (escolhido) { updateData.anime_id = escolhido.id; updateData.ep_id = escolhido.ep_id; }
-    if (protegida && senha.length >= 4) { updateData.senha_hash = await sha256Hex(senha); }
-    await sb.from('salas').update(updateData).eq('id', id);
+    const upd = { nome, max_pessoas: maxPessoas };
+    if (escolhido) { upd.anime_id = escolhido.id; upd.ep_id = escolhido.ep_id; }
+    if (protegida && senha.length >= 4) upd.senha_hash = await sha256Hex(senha);
+    const { error } = await sb.from('salas').update(upd).eq('id', id);
+    if (error) throw error;
     closeModal('criarSala');
     showNotif('✅ Sala atualizada!', 'success');
-    // Restaura modal ao estado original
-    document.getElementById('modal-criarSala').querySelector('.modal-logo span').textContent = '🎉 Criar Sala';
-    document.getElementById('salaCriarBtn').textContent = 'Criar e entrar na sala';
-    document.getElementById('salaCriarBtn').onclick = criarSala;
-    window._editandoSalaId = null;
+    _resetCriarSalaModal();
     renderSalas();
   } catch(e) {
-    showErr('salaCriarErr', '❌ Não foi possível salvar.');
+    console.error('salvarEdicaoSala:', e);
+    showErr('salaCriarErr', '❌ Não foi possível salvar as alterações.');
   } finally {
     btn.disabled = false;
   }
 }
+
+// ── Trocar título (host) ──
 function openTrocarTituloModal() {
   if (!currentRoom || !currentRoom.isHost) return;
   document.getElementById('trocarAnimeBusca').value = '';
@@ -2386,7 +2494,8 @@ async function confirmTrocarTitulo() {
   try {
     const { error } = await sb.from('salas').update({ anime_id: escolhido.id, ep_id: escolhido.ep_id }).eq('id', currentRoom.id);
     if (error) throw error;
-    currentRoom.anime_id = escolhido.id; currentRoom.ep_id = escolhido.ep_id;
+    currentRoom.anime_id = escolhido.id;
+    currentRoom.ep_id    = escolhido.ep_id;
     closeModal('trocarTitulo');
     showNotif('🔄 Título da sala atualizado para todos.', 'success');
     renderPlayer({ animeId: escolhido.id, epId: escolhido.ep_id, salaId: currentRoom.id });
@@ -2439,7 +2548,7 @@ async function sendSalaMsg() {
   if (error) { console.error('sendSalaMsg error:', error); showNotif('❌ Não foi possível enviar a mensagem.', 'error'); }
 }
 
-// Fecha os dropdowns de busca da sala ao clicar fora
+// Fecha dropdowns de busca ao clicar fora
 document.addEventListener('click', (e) => {
   ['salaAnimeDropdown','trocarAnimeDropdown'].forEach(id => {
     const dd = document.getElementById(id);
@@ -3262,6 +3371,42 @@ async function renderPlayer(data) {
     } catch(e) { console.error('watch_history error:', e); }
   }
   renderComments();
+  // Em sala: todos esperam o dono dar play manualmente.
+  // Membros sempre veem a tela de espera; dono vê se a sala estiver pausada.
+  if (currentRoom) {
+    const isPaused = currentRoom.paused !== false;
+    if (!currentRoom.isHost || isPaused) {
+      const container = document.getElementById('videoPlayer');
+      if (container) {
+        container.style.aspectRatio = '16/9';
+        container.style.height = '';
+        if (currentRoom.isHost) {
+          container.innerHTML = `<div class="player-inner" id="playerContent" style="display:flex">
+            <div style="font-size:3rem;margin-bottom:.5rem">👑</div>
+            <div style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:.4rem">${sanitize(fullTitle)}</div>
+            <div style="font-size:.85rem;color:var(--text3);text-align:center;max-width:340px;line-height:1.65">
+              Você é o dono da sala.<br>
+              Clique em <strong style="color:var(--gold)">▶ Play para todos</strong> na barra acima para iniciar para todos.
+            </div>
+          </div>`;
+        } else {
+          container.innerHTML = `<div class="player-inner" id="playerContent" style="display:flex">
+            <div style="font-size:3rem;margin-bottom:.5rem">⏸</div>
+            <div style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:.4rem">${sanitize(fullTitle)}</div>
+            <div style="font-size:.85rem;color:var(--text3);text-align:center;max-width:340px;line-height:1.65">
+              Aguardando o dono dar <strong style="color:var(--gold)">▶ Play</strong>.<br>
+              Quando ele iniciar, o vídeo aparece aqui para todos.
+            </div>
+          </div>`;
+        }
+      }
+      setTimeout(() => {
+        const pb = document.getElementById('prevEpBtn'); if(pb) pb.style.display = 'none';
+        const nb = document.getElementById('nextEpBtn'); if(nb) nb.style.display = 'none';
+      }, 50);
+      return;
+    }
+  }
   loadVideoUrl(ep.video_url || '', resumePct);
   // After loadVideoUrl, real player may have replaced DOM — re-apply prev/next visibility
   setTimeout(() => {
