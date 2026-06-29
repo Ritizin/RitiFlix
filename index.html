@@ -1302,6 +1302,16 @@ function isSafeUrl(str){
   catch(e) { return false; }
 }
 
+// Detecta se a URL é um arquivo de vídeo direto (player nativo, com sync de posição completo)
+// ou um link de embed/iframe de terceiro (ex: superflixapi) — onde só play/pause geral sincroniza,
+// nunca a posição exata, por restrição de segurança do navegador (cross-origin).
+function isDirectVideoUrl(str){
+  if (!str) return false;
+  const s = String(str).trim();
+  if (/^superflix2?:/i.test(s)) return false;
+  return /\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(s);
+}
+
 // ============================================================
 // TMDb — API Integration
 // Nota de segurança: este token é de "leitura" (api_read) do TMDb e fica
@@ -2128,6 +2138,12 @@ async function criarSala() {
     if (!row) { showErr('salaCriarErr', '❌ A sala não foi criada — verifique as permissões (RLS) de INSERT na tabela "salas" no Supabase.'); return; }
     closeModal('criarSala');
     showNotif('🎉 Sala criada! Bom filme :)', 'success');
+    try {
+      const { data: epCheck } = await sb.from('episodes').select('video_url').eq('id', escolhido.ep_id).maybeSingle();
+      if (epCheck && epCheck.video_url && !isDirectVideoUrl(epCheck.video_url)) {
+        showNotif('ℹ️ Esse título usa link de embed (ex: superflix) — só play/pause geral sincroniza, a posição exata não. Para sync completo, cadastre um vídeo .mp4/.m3u8 direto.', 'success');
+      }
+    } catch(e) {}
     enterSala(row, true);
   } catch(e) {
     console.error('criarSala error:', e);
@@ -2246,6 +2262,17 @@ function subscribeSala(id) {
         }
       }
     })
+    // Sincronização contínua de posição — só pra membros, com player de vídeo nativo (mp4/m3u8).
+    // O dono manda a posição atual a cada poucos segundos; o membro ajusta se a diferença for grande.
+    .on('broadcast', { event: 'sala_time_sync' }, ({ payload }) => {
+      if (!currentRoom || currentRoom.isHost || !payload) return;
+      const video = document.getElementById('animePlayer');
+      if (!video) return; // membro está usando player embed (iframe) — não dá pra sincronizar posição nesse caso
+      const drift = Math.abs(video.currentTime - payload.t);
+      if (drift > 2.5) video.currentTime = payload.t;
+      if (payload.paused && !video.paused) video.pause();
+      if (!payload.paused && video.paused) video.play().catch(()=>{});
+    })
     .subscribe(status => {
       if (status === 'SUBSCRIBED' && currentUser) {
         _salaChannel.track({ username: currentUser.username });
@@ -2287,6 +2314,7 @@ function onSalaUpdate(newRow) {
 
 async function leaveSala(showMsg = true) {
   if (!currentRoom) return;
+  if (window._salaSyncInterval) { clearInterval(window._salaSyncInterval); window._salaSyncInterval = null; }
   // Decrementa contagem de membros para não-donos
   if (!currentRoom.isHost) {
     try {
@@ -2494,6 +2522,14 @@ async function salvarEdicaoSala() {
     if (!data || !data.length) { showErr('salaCriarErr', '❌ A sala não foi atualizada — verifique as permissões (RLS) de UPDATE na tabela "salas" no Supabase.'); return; }
     closeModal('criarSala');
     showNotif('✅ Sala atualizada!', 'success');
+    if (escolhido && escolhido.ep_id) {
+      try {
+        const { data: epCheck } = await sb.from('episodes').select('video_url').eq('id', escolhido.ep_id).maybeSingle();
+        if (epCheck && epCheck.video_url && !isDirectVideoUrl(epCheck.video_url)) {
+          showNotif('ℹ️ Esse título usa link de embed — só play/pause geral sincroniza, não a posição exata.', 'success');
+        }
+      } catch(e) {}
+    }
     _resetCriarSalaModal();
     renderSalas();
   } catch(e) {
@@ -3216,6 +3252,11 @@ function loadVideoUrl(videoUrl, resumePct) {
   window.open = function() { return null; };
 }
 
+function _broadcastSalaTime(video) {
+  if (!currentRoom || !currentRoom.isHost || !_salaChannel || !video) return;
+  _salaChannel.send({ type: 'broadcast', event: 'sala_time_sync', payload: { t: video.currentTime, paused: video.paused } }).catch(()=>{});
+}
+
 function _wireRealPlayer(video, resumePct) {
   if (!video) return;
   _lastProgressSave = 0;
@@ -3258,12 +3299,22 @@ function _wireRealPlayer(video, resumePct) {
     } catch(e){}
   });
 
-  video.addEventListener('play', () => { const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '⏸'; });
+  video.addEventListener('play', () => { const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '⏸'; _broadcastSalaTime(video); });
   video.addEventListener('pause', () => {
     const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '▶';
     if (isFinite(video.duration) && video.duration > 0)
       saveWatchProgress((video.currentTime / video.duration) * 100, true);
+    _broadcastSalaTime(video);
   });
+  video.addEventListener('seeked', () => _broadcastSalaTime(video));
+
+  // ── Sincronização de sala (player nativo) ──
+  // Se for o dono numa sala, manda a posição atual pra todo mundo a cada 3s,
+  // pra quem tem o mesmo tipo de player (mp4/m3u8) ficar sempre no mesmo ponto do vídeo.
+  if (window._salaSyncInterval) { clearInterval(window._salaSyncInterval); window._salaSyncInterval = null; }
+  if (currentRoom && currentRoom.isHost) {
+    window._salaSyncInterval = setInterval(() => _broadcastSalaTime(video), 3000);
+  }
 
   video.addEventListener('ended', () => {
     saveWatchProgress(100, true);
