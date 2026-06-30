@@ -2427,17 +2427,34 @@ async function salaHostPause() {
 // Forca sincronizacao imediata de todos com o tempo atual do host
 async function salaHostSyncNow() {
   if (!currentRoom || !currentRoom.isHost) return;
-  const video = window._activeVideo;
+  const epId = currentEpId || currentRoom.ep_id;
+  const video = window._activeVideo || document.getElementById('animePlayer');
   if (video) {
+    // Vídeo nativo: sincroniza com tempo real
     _broadcastSalaTime(video, true);
     if (_salaChannel) {
       const ev = video.paused ? 'sala_pause' : 'sala_play';
       _salaChannel.send({ type:'broadcast', event: ev,
-        payload:{ ep_id: currentEpId, anime_id: currentAnimeId, t: video.currentTime } }).catch(()=>{});
+        payload:{ ep_id: epId, anime_id: currentAnimeId, t: video.currentTime } }).catch(()=>{});
     }
     showNotif('🔄 Todos sincronizados no tempo ' + fmtTime(video.currentTime) + '!', 'success');
+  } else if (document.getElementById('iframeVideo') || document.getElementById('iframePlayerWrap')) {
+    // Iframe/superflix: não tem API de tempo, mas manda sala_play para forçar membros a carregarem
+    if (_salaChannel) {
+      _salaChannel.send({ type:'broadcast', event:'sala_play',
+        payload:{ ep_id: epId, anime_id: currentAnimeId, t: 0 } }).catch(()=>{});
+    }
+    showNotif('🔄 Sincronizado! (player embed — sem controle de tempo)', 'success');
   } else {
-    showNotif('⚠️ Player nao carregado. Clique em Play para todos primeiro.', 'error');
+    // Nenhum player carregado — dispara _hostLoadVideo e manda broadcast
+    if (epId && _salaChannel) {
+      _salaChannel.send({ type:'broadcast', event:'sala_play',
+        payload:{ ep_id: epId, anime_id: currentAnimeId, t: 0 } }).catch(()=>{});
+      _hostLoadVideo();
+      showNotif('▶ Player carregando — membros sincronizados!', 'success');
+    } else {
+      showNotif('⚠️ Nenhum episódio carregado.', 'error');
+    }
   }
 }
 
