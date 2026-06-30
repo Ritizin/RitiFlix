@@ -636,9 +636,231 @@ input:focus~.search-kbd,.search-wrap input:focus~.search-kbd{opacity:0}
   .stat-icon{font-size:1.4rem}
   .modal{padding:1.5rem 1rem}
 }
+
+/* ───────────────── RITIFLIX ADVANCED CSS ───────────────── */
+
+/* Ambient Glow */
+.ambient-glow-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.ambient-glow-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1.2);
+  width: 100%;
+  height: 100%;
+  filter: blur(64px);
+  opacity: 0;
+  transition: opacity 1.5s ease;
+  mix-blend-mode: screen;
+}
+.ambient-active .ambient-glow-canvas {
+  opacity: 0.35;
+}
+.real-player-wrap {
+  z-index: 2;
+}
+
+/* Theater Mode */
+body.theater-mode #page-player .player-wrap {
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+body.theater-mode #page-player .video-player {
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+body.theater-mode #page-player .real-player-wrap {
+  border-radius: 0 !important;
+}
+body.theater-mode #page-player .iframe-player-wrap {
+  border-radius: 0 !important;
+}
+body.theater-mode #page-player .iframe-controls {
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+body.theater-mode #page-player .player-info-bar,
+body.theater-mode #page-player .comment-section {
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+
+/* Floating Reactions */
+.reactions-tray {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  margin-top: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+.reaction-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.reaction-btn:hover {
+  transform: scale(1.35) translateY(-3px);
+}
+.floating-reaction {
+  position: absolute;
+  bottom: 12%;
+  right: 8%;
+  font-size: 2.5rem;
+  pointer-events: none;
+  z-index: 100;
+  animation: floatUp 2.5s cubic-bezier(0.08, 0.8, 0.44, 1) forwards;
+  user-select: none;
+}
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) scale(0.3) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    transform: translateY(-20px) scale(1.15) rotate(-6deg);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-260px) scale(0.75) rotate(16deg);
+    opacity: 0;
+  }
+}
+
+/* Typing Indicator */
+.typing-indicator {
+  font-size: 0.72rem;
+  color: var(--text3);
+  padding: 0.35rem 0.5rem;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.typing-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--text3);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Speed Popover & Shortcut Overlay */
+.rpc-speed-wrap {
+  position: relative;
+}
+.rpc-speed-popover {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 50%;
+  transform: translateX(50%);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.4rem 0;
+  min-width: 95px;
+  box-shadow: var(--shadow);
+  display: none;
+  z-index: 15;
+}
+.rpc-speed-popover.show {
+  display: block;
+}
+.rpc-speed-item {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.78rem;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  font-weight: 600;
+}
+.rpc-speed-item:hover, .rpc-speed-item.active {
+  background: rgba(201, 168, 76, 0.08);
+  color: var(--gold);
+}
+.player-overlay-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: rgba(7, 9, 15, 0.85);
+  border: 2px solid var(--gold);
+  color: var(--gold2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  z-index: 12;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.player-overlay-icon.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Connectivity Banner */
+.connectivity-banner {
+  background: rgba(239, 68, 68, 0.95);
+  color: #fff;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 1rem;
+  position: fixed;
+  top: 68px;
+  left: 0;
+  right: 0;
+  z-index: 998;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(4px);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+body.is-offline-mode .connectivity-banner {
+  display: flex;
+}
+@media (max-width: 768px) {
+  .connectivity-banner {
+    top: 60px;
+  }
+}
+
 </style>
 </head>
 <body>
+<!-- CONNECTIVITY BANNER -->
+<div class="connectivity-banner" id="offlineBanner">⚠️ Modo Offline Ativo. Sem conexão com a internet.</div>
 
 <!-- LOADER -->
 <div class="page-loader" id="loader">
@@ -680,8 +902,18 @@ document.addEventListener('DOMContentLoaded', function() {
     <button class="modal-close" style="position:static" onclick="toggleSalaChatPanel()">✕</button>
   </div>
   <div class="sala-chat-msgs" id="salaChatMsgs"></div>
+  <div class="typing-indicator hidden" id="salaTypingIndicator"></div>
+  <div class="reactions-tray" id="salaReactionsTray">
+    <button class="reaction-btn" onclick="sendSalaReaction('❤️')">❤️</button>
+    <button class="reaction-btn" onclick="sendSalaReaction('😂')">😂</button>
+    <button class="reaction-btn" onclick="sendSalaReaction('😮')">😮</button>
+    <button class="reaction-btn" onclick="sendSalaReaction('😢')">😢</button>
+    <button class="reaction-btn" onclick="sendSalaReaction('👍')">👍</button>
+    <button class="reaction-btn" onclick="sendSalaReaction('🍿')">🍿</button>
+    <button class="reaction-btn" onclick="sendSalaReaction('💥')">💥</button>
+  </div>
   <div class="sala-chat-input-row">
-    <input type="text" id="salaChatInput" placeholder="Diga algo..." maxlength="300" onkeydown="if(event.key==='Enter')sendSalaMsg()">
+    <input type="text" id="salaChatInput" placeholder="Diga algo..." maxlength="300" onkeydown="if(event.key==='Enter')sendSalaMsg()" oninput="handleChatTyping()">
     <button class="btn btn-red" style="padding:.5rem .9rem" onclick="sendSalaMsg()">➤</button>
   </div>
 </div>
@@ -2246,7 +2478,10 @@ function subscribeSala(id) {
   _salaChannel
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'salas', filter: 'id=eq.'+id }, payload => onSalaUpdate(payload.new))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'salas_mensagens', filter: 'sala_id=eq.'+id }, payload => appendSalaMsg(payload.new))
-    .on('presence', { event: 'sync' }, () => updateSalaViewerCount())
+    .on('presence', { event: 'sync' }, () => { updateSalaViewerCount(); updateTypingIndicators(); })
+    .on('broadcast', { event: 'sala_reaction' }, ({ payload }) => {
+      if (payload && payload.emoji) showFloatingReaction(payload.emoji);
+    })
 
     // PLAY: dono liberou o video
     .on('broadcast', { event: 'sala_play' }, ({ payload }) => {
@@ -3330,10 +3565,12 @@ function loadVideoUrl(videoUrl, resumePct) {
     // Custom player with real controls
     const vpEl = document.getElementById('videoPlayer');
     vpEl.innerHTML = `
-      <div class="real-player-wrap" id="realPlayerWrap">
-        <video id="animePlayer" style="width:100%;max-height:70vh;background:#000;display:block" preload="metadata"></video>
-        <div class="rpc" id="rpc">
-          <span class="rpc-kbd-hint">Espaço: play/pause · F: tela cheia · ← →: 10s · M: mudo</span>
+      <div class="real-player-wrap ambient-active" id="realPlayerWrap">
+        <div class="ambient-glow-container" id="ambientGlowContainer"><canvas class="ambient-glow-canvas" id="ambientGlowCanvas"></canvas></div>
+        <video id="animePlayer" style="width:100%;max-height:70vh;background:#000;display:block;position:relative;z-index:2" preload="metadata" crossorigin="anonymous" onwheel="handleVideoWheel(event)" ondblclick="handleVideoDblClick(event)"></video>
+        <div class="player-overlay-icon" id="playerOverlayIcon"></div>
+        <div class="rpc" id="rpc" style="z-index:3">
+          <span class="rpc-kbd-hint">Espaço: play/pause · F: tela cheia · ← →: 10s · M: mudo · Scroll: volume</span>
           <div class="rpc-progress" id="rpcBar">
             <div class="rpc-progress-buf" id="rpcBuf" style="width:0%"></div>
             <div class="rpc-progress-fill" id="rpcFill" style="width:0%"></div>
@@ -3349,6 +3586,20 @@ function loadVideoUrl(videoUrl, resumePct) {
             <div class="rpc-vol">
               <button class="rpbtn" id="rpcMuteBtn" onclick="rpcToggleMute()">🔊</button>
               <input class="rpc-vol-slider" id="rpcVol" type="range" min="0" max="1" step="0.05" value="1" oninput="rpcSetVol(this.value)">
+            </div>
+            <button class="rpbtn" id="rpcAmbientBtn" onclick="rpcToggleAmbient()" title="Efeito ambiente (brilho)">🌟</button>
+            <button class="rpbtn" id="rpcTheaterBtn" onclick="rpcToggleTheater()" title="Modo Teatro">🎭</button>
+            <button class="rpbtn" id="rpcPipBtn" onclick="rpcTogglePip()" title="Picture-in-Picture">📺</button>
+            <div class="rpc-speed-wrap">
+              <button class="rpbtn" id="rpcSpeedBtn" onclick="rpcToggleSpeedPopover()" title="Velocidade de reprodução">⚙️ 1.0x</button>
+              <div class="rpc-speed-popover" id="rpcSpeedPopover">
+                <div class="rpc-speed-item" onclick="rpcSetSpeed(0.5)">0.5x</div>
+                <div class="rpc-speed-item" onclick="rpcSetSpeed(0.75)">0.75x</div>
+                <div class="rpc-speed-item active" onclick="rpcSetSpeed(1.0)">Normal</div>
+                <div class="rpc-speed-item" onclick="rpcSetSpeed(1.25)">1.25x</div>
+                <div class="rpc-speed-item" onclick="rpcSetSpeed(1.5)">1.5x</div>
+                <div class="rpc-speed-item" onclick="rpcSetSpeed(2.0)">2.0x</div>
+              </div>
             </div>
             <button class="rpbtn" onclick="rpcFullscreen()" title="Tela cheia">⛶</button>
           </div>
@@ -3445,6 +3696,7 @@ function _wireRealPlayer(video, resumePct) {
 
   video.addEventListener('play', async () => {
     const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '⏸';
+    try { startAmbientGlow(); } catch(e) {}
     window._activeVideo = video;
     if (currentRoom && currentRoom.isHost) {
       currentRoom.paused = false;
@@ -3458,6 +3710,7 @@ function _wireRealPlayer(video, resumePct) {
 
   video.addEventListener('pause', async () => {
     const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '▶';
+    try { stopAmbientGlow(); } catch(e) {}
     if (isFinite(video.duration) && video.duration > 0)
       saveWatchProgress((video.currentTime / video.duration) * 100, true);
     if (currentRoom && currentRoom.isHost) {
@@ -3487,9 +3740,19 @@ function _wireRealPlayer(video, resumePct) {
   }
 
   video.addEventListener('ended', () => {
+    try { stopAmbientGlow(); } catch(e) {}
     saveWatchProgress(100, true);
     showNotif('Episódio concluído! 🎉', 'success');
     _startNextEpCountdown();
+  });
+
+  // Dismiss speed popover on click outside
+  document.addEventListener('click', e => {
+    const pop = document.getElementById('rpcSpeedPopover');
+    const btn = document.getElementById('rpcSpeedBtn');
+    if (pop && pop.classList.contains('show') && !pop.contains(e.target) && e.target !== btn) {
+      pop.classList.remove('show');
+    }
   });
 
   // Click progress bar
@@ -4004,16 +4267,7 @@ async function renderAdminDashboard(el) {
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
     <div class="dash-chart-wrap">
       <div class="admin-section-title" style="margin-bottom:1rem">📅 Visualizações (7 dias)</div>
-      <div class="dash-mini-bar">
-        ${dayBuckets.map(d => {
-          const val = watchByDay[d]; const h = Math.max(6, Math.round((val/maxW)*60));
-          const label = new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'});
-          return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:4px" title="${label}: ${val} visualizações">
-            <div class="dmb-col" style="height:${h}px;${val===0?'opacity:.25':''}"></div>
-            <div style="font-size:.55rem;color:var(--text3);white-space:nowrap">${label}</div>
-          </div>`;
-        }).join('')}
-      </div>
+      <div style="width:100%; height:180px; display:flex; align-items:center" id="adminVisitsSvgChart"></div>
     </div>
     <div class="dash-chart-wrap">
       <div class="admin-section-title" style="margin-bottom:1rem">🏷️ Catálogo por Gênero</div>
@@ -4053,6 +4307,7 @@ async function renderAdminDashboard(el) {
       <button class="btn btn-ghost" style="margin-top:1rem;font-size:.8rem;width:100%" onclick="adminNav('comments',null)">Ver todos →</button>
     </div>
   </div>`;
+  try { renderAdminSvgChart(dayBuckets, watchByDay, maxW); } catch(e) { console.error('SVG Chart Render Error:', e); }
 }
 
 let adminAnimeFilter = 'Todos';
@@ -4160,7 +4415,10 @@ async function renderAdminAnimes(el) {
   else if (adminAnimeFilter === 'Animação') animes = allAnimes.filter(isAnimeAnimacao);
   el.innerHTML = `
   <div class="admin-header-bar" style="position:relative">
-    <div class="admin-page-title">🎬 Títulos</div>
+    <div class="admin-page-title" style="display:flex;align-items:center;gap:1.5rem">
+      <span>🎬 Títulos</span>
+      ${!isColecao ? `<button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.78rem" onclick="exportTableToCSV(_adminAnimesCache, 'titulos_ritiflix', ['id','title','year','score','type','genres'])">📥 Exportar CSV</button>` : ''}
+    </div>
     ${!isColecao ? `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,40%)">
       <div class="search-wrap" style="width:100%">
         <input class="form-input" id="adminAnimeSearchInput" value="${sanitize(adminAnimeSearch||'')}" placeholder="🔍 Buscar filme, série ou animação..." oninput="debouncedAdminAnimeSearch(this.value)" autocomplete="off" style="width:100%">
@@ -5208,9 +5466,13 @@ async function loadHeroBannerSettings() {
 
 async function renderAdminUsers(el) {
   const { data: users } = await sb.from('profiles').select('*').order('created_at');
+  window._adminUsersCache = users || [];
   el.innerHTML = `
   <div class="admin-header-bar">
-    <div class="admin-page-title">👥 Usuários</div>
+    <div class="admin-page-title" style="display:flex;align-items:center;gap:1.5rem">
+      <span>👥 Usuários</span>
+      <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.78rem" onclick="exportTableToCSV(window._adminUsersCache, 'usuarios_ritiflix', ['id','username','role','banned','created_at'])">📥 Exportar CSV</button>
+    </div>
     <div style="font-size:.875rem;color:var(--text3)">${(users||[]).length} usuários cadastrados</div>
   </div>
   <div class="admin-table">
@@ -5253,9 +5515,13 @@ async function changeRole(id, role) {
 
 async function renderAdminComments(el) {
   const { data: comments } = await sb.from('comments').select('*, profiles(username, avatar), animes(title)').order('created_at', { ascending: false });
+  window._adminCommentsCache = comments || [];
   el.innerHTML = `
   <div class="admin-header-bar">
-    <div class="admin-page-title">💬 Comentários</div>
+    <div class="admin-page-title" style="display:flex;align-items:center;gap:1.5rem">
+      <span>💬 Comentários</span>
+      <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.78rem" onclick="exportTableToCSV(window._adminCommentsCache, 'comentarios_ritiflix', ['id','user_id','anime_id','text','created_at'])">📥 Exportar CSV</button>
+    </div>
     <div style="font-size:.875rem;color:var(--text3)">${(comments||[]).length} comentários</div>
   </div>
   ${!comments || comments.length === 0 ? '<div style="text-align:center;padding:3rem;color:var(--text3)"><div style="font-size:3rem;margin-bottom:1rem">💬</div><p>Nenhum comentário ainda.</p></div>' : `
@@ -5567,6 +5833,334 @@ function toggleMobileMenu() { document.getElementById('mobileNav').classList.tog
 function closeMobileMenu() { document.getElementById('mobileNav').classList.remove('open'); }
 
 // ============================================================
+// RITIFLIX — ADVANCED FUNCTIONS (PWA, PLAYER V2, WATCH PARTY, CHARTS)
+// ============================================================
+
+// PWA & Connectivity
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => {
+          console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
+          reg.addEventListener('updatefound', () => {
+            const installingWorker = reg.installing;
+            installingWorker.addEventListener('statechange', () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                showNotif('Nova versão disponível! Recarregue a página.', 'success');
+              }
+            });
+          });
+        })
+        .catch(err => console.warn('[PWA] Falha no Service Worker:', err));
+    });
+  }
+  
+  window.addEventListener('online', () => {
+    document.body.classList.remove('is-offline-mode');
+    showNotif('🟢 Conexão restabelecida! Modo online ativo.', 'success');
+  });
+  window.addEventListener('offline', () => {
+    document.body.classList.add('is-offline-mode');
+    showNotif('⚠️ Você está offline. Navegando via cache local.', 'error');
+  });
+  if (!navigator.onLine) {
+    document.body.classList.add('is-offline-mode');
+  }
+}
+
+// Ambient Mode (Cinema Glow)
+let ambientInterval = null;
+let ambientEnabled = true;
+
+function rpcToggleAmbient() {
+  ambientEnabled = !ambientEnabled;
+  const btn = document.getElementById('rpcAmbientBtn');
+  const wrap = document.getElementById('realPlayerWrap');
+  if (ambientEnabled) {
+    if (btn) btn.textContent = '🌟';
+    if (wrap) wrap.classList.add('ambient-active');
+    startAmbientGlow();
+  } else {
+    if (btn) btn.textContent = '⭐';
+    if (wrap) wrap.classList.remove('ambient-active');
+    stopAmbientGlow();
+  }
+}
+
+function startAmbientGlow() {
+  if (ambientInterval) clearInterval(ambientInterval);
+  const video = document.getElementById('animePlayer');
+  const canvas = document.getElementById('ambientGlowCanvas');
+  if (!video || !canvas || !ambientEnabled) return;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  
+  canvas.width = 32;
+  canvas.height = 18;
+
+  ambientInterval = setInterval(() => {
+    if (video.paused || video.ended) return;
+    try {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    } catch (e) {
+      // CORS protection context fails silently
+    }
+  }, 200);
+}
+
+function stopAmbientGlow() {
+  if (ambientInterval) {
+    clearInterval(ambientInterval);
+    ambientInterval = null;
+  }
+}
+
+// Player V2 Controls: Theater Mode, PiP, Speed Selector, Shortcuts Visual Indicator
+function rpcToggleTheater() {
+  document.body.classList.toggle('theater-mode');
+  const btn = document.getElementById('rpcTheaterBtn');
+  if (btn) {
+    btn.textContent = document.body.classList.contains('theater-mode') ? '🎬' : '🎭';
+  }
+  window.dispatchEvent(new Event('resize'));
+  showOverlayIndicator(document.body.classList.contains('theater-mode') ? 'Modo Teatro' : 'Modo Padrão');
+}
+
+async function rpcTogglePip() {
+  const video = document.getElementById('animePlayer');
+  if (!video) return;
+  try {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+    } else if (document.pictureInPictureEnabled) {
+      await video.requestPictureInPicture();
+      showOverlayIndicator('PiP Ativo');
+    } else {
+      showNotif('⚠️ Picture-in-Picture não suportado pelo seu navegador.', 'error');
+    }
+  } catch (e) {
+    console.error('[PiP] Error:', e);
+  }
+}
+
+function rpcToggleSpeedPopover() {
+  const el = document.getElementById('rpcSpeedPopover');
+  if (el) el.classList.toggle('show');
+}
+
+function rpcSetSpeed(speed) {
+  const video = document.getElementById('animePlayer');
+  if (video) video.playbackRate = speed;
+  const btn = document.getElementById('rpcSpeedBtn');
+  if (btn) btn.textContent = '⚙️ ' + (speed === 1.0 ? 'Normal' : speed + 'x');
+  
+  document.querySelectorAll('.rpc-speed-item').forEach(item => {
+    item.classList.remove('active');
+    const valText = item.getAttribute('onclick').match(/[\d.]+/);
+    if (valText && parseFloat(valText[0]) === speed) item.classList.add('active');
+  });
+  
+  const el = document.getElementById('rpcSpeedPopover');
+  if (el) el.classList.remove('show');
+  showOverlayIndicator('⚙️ ' + speed + 'x');
+}
+
+function showOverlayIndicator(text) {
+  const el = document.getElementById('playerOverlayIcon');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(window._overlayTimer);
+  window._overlayTimer = setTimeout(() => {
+    el.classList.remove('show');
+  }, 600);
+}
+
+function handleVideoDblClick(e) {
+  const video = document.getElementById('animePlayer');
+  if (!video) return;
+  const rect = video.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const pct = x / rect.width;
+  if (pct < 0.4) {
+    rpcSkip(-10);
+    showOverlayIndicator('⏪ -10s');
+  } else if (pct > 0.6) {
+    rpcSkip(10);
+    showOverlayIndicator('⏩ +10s');
+  } else {
+    rpcFullscreen();
+  }
+}
+
+function handleVideoWheel(e) {
+  const video = document.getElementById('animePlayer');
+  if (!video) return;
+  e.preventDefault();
+  if (e.deltaY < 0) {
+    video.volume = Math.min(1, video.volume + 0.05);
+  } else {
+    video.volume = Math.max(0, video.volume - 0.05);
+  }
+  video.muted = (video.volume === 0);
+  const sl = document.getElementById('rpcVol');
+  if (sl) sl.value = video.volume;
+  const btn = document.getElementById('rpcMuteBtn');
+  if (btn) btn.textContent = video.muted ? '🔇' : (video.volume < 0.5 ? '🔉' : '🔊');
+  showOverlayIndicator('🔊 ' + Math.round(video.volume * 100) + '%');
+}
+
+// Watch Party: Typing Indicator & Reactions
+let typingTimeout = null;
+function handleChatTyping() {
+  if (!currentRoom || !_salaChannel || !currentUser) return;
+  if (!window._isTyping) {
+    window._isTyping = true;
+    _salaChannel.track({ username: currentUser.username, typing: true });
+  }
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    window._isTyping = false;
+    if (_salaChannel) _salaChannel.track({ username: currentUser.username, typing: false });
+  }, 3000);
+}
+
+function updateTypingIndicators() {
+  const el = document.getElementById('salaTypingIndicator');
+  if (!el || !_salaChannel) return;
+  const state = _salaChannel.presenceState();
+  const typers = [];
+  Object.values(state || {}).forEach(presenceList => {
+    presenceList.forEach(p => {
+      if (p.username !== currentUser?.username && p.typing) {
+        typers.push(p.username);
+      }
+    });
+  });
+  if (typers.length > 0) {
+    el.textContent = typers.join(', ') + (typers.length === 1 ? ' está digitando' : ' estão digitando') + '...';
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+function sendSalaReaction(emoji) {
+  if (!currentRoom || !_salaChannel || !currentUser) return;
+  _salaChannel.send({
+    type: 'broadcast',
+    event: 'sala_reaction',
+    payload: { emoji, username: currentUser.username }
+  }).catch(e => console.error(e));
+  showFloatingReaction(emoji);
+}
+
+function showFloatingReaction(emoji) {
+  const player = document.getElementById('realPlayerWrap') || document.getElementById('videoPlayer');
+  if (!player) return;
+  const div = document.createElement('div');
+  div.className = 'floating-reaction';
+  div.textContent = emoji;
+  const offset = Math.floor(Math.random() * 80) - 40; // -40px to +40px
+  div.style.right = `calc(8% + ${offset}px)`;
+  player.appendChild(div);
+  setTimeout(() => div.remove(), 2500);
+}
+
+// Admin SVG visits chart drawer
+function renderAdminSvgChart(dayBuckets, watchByDay, maxW) {
+  const container = document.getElementById('adminVisitsSvgChart');
+  if (!container) return;
+  
+  const width = container.clientWidth || 550;
+  const height = 180;
+  const padding = { top: 15, right: 30, bottom: 25, left: 40 };
+  
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  
+  const points = [];
+  dayBuckets.forEach((d, idx) => {
+    const val = watchByDay[d] || 0;
+    const x = padding.left + (idx / (dayBuckets.length - 1)) * chartWidth;
+    const y = padding.top + chartHeight - (val / maxW) * chartHeight;
+    points.push({ x, y, val, label: new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}), date: d });
+  });
+  
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const areaPath = linePath + ` L ${points[points.length-1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+  
+  let gridHtml = '';
+  const gridCount = 3;
+  for (let i = 0; i <= gridCount; i++) {
+    const y = padding.top + (i / gridCount) * chartHeight;
+    const valLabel = Math.round(maxW - (i / gridCount) * maxW);
+    gridHtml += `
+      <line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="var(--border)" stroke-dasharray="3,3" />
+      <text x="${padding.left - 10}" y="${y + 3}" fill="var(--text3)" font-size="9" text-anchor="end" font-family="'Outfit',sans-serif">${valLabel}</text>
+    `;
+  }
+  
+  let pointsHtml = '';
+  points.forEach(p => {
+    pointsHtml += `
+      <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="var(--gold2)" stroke="var(--bg2)" stroke-width="2" class="chart-point" style="cursor: pointer" />
+      <text x="${p.x}" y="${padding.top + chartHeight + 15}" fill="var(--text2)" font-size="9" text-anchor="middle" font-family="'Outfit',sans-serif" font-weight="600">${p.label}</text>
+      <title>${p.date} (${p.label}): ${p.val} visualizações</title>
+    `;
+  });
+  
+  const svgHtml = `
+    <svg width="100%" height="${height}" style="overflow: visible">
+      <defs>
+        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="var(--gold)" stop-opacity="0.00"/>
+        </linearGradient>
+      </defs>
+      ${gridHtml}
+      <path d="${areaPath}" fill="url(#chartGrad)" />
+      <path d="${linePath}" fill="none" stroke="var(--gold)" stroke-width="2.5" />
+      ${pointsHtml}
+    </svg>
+  `;
+  
+  container.innerHTML = svgHtml;
+}
+
+// CSV Exporter helper
+function exportTableToCSV(tableData, filename, headers) {
+  if (!tableData || !tableData.length) {
+    showNotif('⚠️ Sem dados para exportar.', 'error');
+    return;
+  }
+  let csvContent = '\uFEFF';
+  csvContent += headers.join(',') + '\n';
+  
+  tableData.forEach(row => {
+    const line = headers.map(header => {
+      let val = row[header];
+      if (val === null || val === undefined) val = '';
+      else if (Array.isArray(val)) val = val.join('|');
+      else if (typeof val === 'object') val = JSON.stringify(val);
+      
+      val = String(val).replace(/"/g, '""');
+      return `"${val}"`;
+    });
+    csvContent += line.join(',') + '\n';
+  });
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute('download', filename + '.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showNotif('📥 Dados exportados com sucesso!', 'success');
+}
+
+// ============================================================
 // INIT
 // ============================================================
 const hideLoader = () => {
@@ -5585,6 +6179,8 @@ async function initApp() {
   }
   try { await Promise.race([checkAuth(), new Promise(resolve=>setTimeout(resolve,4000))]); } catch(e) { currentUser=null; }
   try { loadHeroBannerSettings(); } catch(e) {}
+  // Register Service Worker & Connectivity Listeners
+  try { registerServiceWorker(); } catch(e) { console.error('PWA Reg Error:', e); }
   hideLoader();
   navigate(window.RITIFLIX_ENTRY || 'home');
 }

@@ -1,184 +1,103 @@
-// RitiFlix Service Worker - PWA Offline Support
-const CACHE_NAME = 'ritiflix-v1';
-const STATIC_CACHE = 'ritiflix-static-v1';
-const DYNAMIC_CACHE = 'ritiflix-dynamic-v1';
-
-// Arquivos essenciais para cache estático (shell do app)
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap'
+const CACHE_NAME = 'ritiflix-cache-v1';
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './site.webmanifest',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js',
+  'https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js',
+  'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap',
+  'https://fonts.gstatic.com/s/outfit/v11/F3uwYwQ20dJ529OWyT-5s0tD.woff2',
+  'https://fonts.gstatic.com/s/playfairdisplay/v37/nuFvD7Kzo1gY8F6KgNtF6VjBVFKeODvXX1Y3agbC.woff2'
 ];
 
-// ============================================================
-// INSTALL — faz cache dos assets estáticos
-// ============================================================
+// Install Event
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando RitiFlix Service Worker...');
   event.waitUntil(
-    caches.open(STATIC_CACHE).then(cache => {
-      console.log('[SW] Cacheando assets estáticos...');
-      return cache.addAll(STATIC_ASSETS);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[Service Worker] Caching app shell and CDNs');
+        return cache.addAll(ASSETS_TO_CACHE);
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
-// ============================================================
-// ACTIVATE — limpa caches antigos
-// ============================================================
+// Activate Event
 self.addEventListener('activate', event => {
-  console.log('[SW] Ativando RitiFlix Service Worker...');
   event.waitUntil(
-    caches.keys().then(keys => {
+    caches.keys().then(cacheKeys => {
       return Promise.all(
-        keys
-          .filter(key => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
-          .map(key => {
-            console.log('[SW] Removendo cache antigo:', key);
+        cacheKeys.map(key => {
+          if (key !== CACHE_NAME) {
+            console.log('[Service Worker] Removing old cache:', key);
             return caches.delete(key);
-          })
+          }
+        })
       );
     }).then(() => self.clients.claim())
   );
 });
 
-// ============================================================
-// FETCH — estratégia de cache
-// ============================================================
+// Fetch Event
 self.addEventListener('fetch', event => {
-  const { request } = event;
-  const url = new URL(request.url);
+  // Only handle GET requests and local/CDN resources (exclude API calls to Supabase, TMDB, dood, superflix, etc.)
+  if (event.request.method !== 'GET') return;
 
-  // Ignora requisições não-GET
-  if (request.method !== 'GET') return;
+  const url = new URL(event.request.url);
 
-  // Ignora requisições para APIs externas (Supabase, TMDB) — sempre online
+  // Exclude Supabase database/auth requests and external movie APIs
   if (
-    url.hostname.includes('supabase.co') ||
-    url.hostname.includes('themoviedb.org') ||
-    url.hostname.includes('image.tmdb.org')
+    url.hostname.includes('supabase.co') && !url.pathname.endsWith('.js') ||
+    url.hostname.includes('api.themoviedb.org') ||
+    url.hostname.includes('superflixapi') ||
+    url.hostname.includes('dood') ||
+    url.hostname.includes('playmogo')
   ) {
-    event.respondWith(
-      fetch(request).catch(() => new Response(JSON.stringify({ error: 'Offline' }), {
-        headers: { 'Content-Type': 'application/json' }
-      }))
-    );
     return;
   }
 
-  // Para imagens externas (posters, thumbs) — cache dinâmico
-  if (request.destination === 'image' && !url.hostname.includes(self.location.hostname)) {
-    event.respondWith(networkFallingBackToCache(request));
-    return;
-  }
+  event.respondWith(
+    caches.match(event.request)
+      .then(cachedResponse => {
+        if (cachedResponse) {
+          // Serve from cache and update in background if it's our index.html or local asset (stale-while-revalidate)
+          if (url.origin === self.location.origin) {
+            fetch(event.request)
+              .then(networkResponse => {
+                if (networkResponse.status === 200) {
+                  caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse));
+                }
+              })
+              .catch(() => {/* Ignore network errors when offline */});
+          }
+          return cachedResponse;
+        }
 
-  // Para assets do app — Cache First
-  if (
-    url.hostname === self.location.hostname ||
-    url.hostname.includes('fonts.googleapis.com') ||
-    url.hostname.includes('fonts.gstatic.com') ||
-    url.hostname.includes('cdn.jsdelivr.net')
-  ) {
-    event.respondWith(cacheFirstStrategy(request));
-    return;
-  }
-
-  // Fallback padrão — Network First
-  event.respondWith(networkFirstStrategy(request));
-});
-
-// ============================================================
-// ESTRATÉGIAS DE CACHE
-// ============================================================
-
-// Cache First: usa cache se disponível, senão busca na rede
-async function cacheFirstStrategy(request) {
-  const cached = await caches.match(request);
-  if (cached) return cached;
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(STATIC_CACHE);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (err) {
-    return new Response('<h1>Sem conexão</h1><p>Verifique sua internet.</p>', {
-      headers: { 'Content-Type': 'text/html' }
-    });
-  }
-}
-
-// Network First: tenta a rede, cai para cache se offline
-async function networkFirstStrategy(request) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(DYNAMIC_CACHE);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (err) {
-    const cached = await caches.match(request);
-    return cached || new Response('<h1>Offline</h1>', {
-      headers: { 'Content-Type': 'text/html' }
-    });
-  }
-}
-
-// Network falling back to cache (para imagens)
-async function networkFallingBackToCache(request) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(DYNAMIC_CACHE);
-      // Limita cache dinâmico a 60 imagens
-      await trimCache(DYNAMIC_CACHE, 60);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (err) {
-    const cached = await caches.match(request);
-    if (cached) return cached;
-    // Retorna placeholder SVG para imagens não disponíveis
-    return new Response(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450">
-        <rect width="300" height="450" fill="#0d1117"/>
-        <text x="150" y="225" fill="#445577" text-anchor="middle" font-family="sans-serif" font-size="14">Imagem indisponível</text>
-      </svg>`,
-      { headers: { 'Content-Type': 'image/svg+xml' } }
-    );
-  }
-}
-
-// Limita o tamanho do cache dinâmico
-async function trimCache(cacheName, maxItems) {
-  const cache = await caches.open(cacheName);
-  const keys = await cache.keys();
-  if (keys.length > maxItems) {
-    await cache.delete(keys[0]);
-  }
-}
-
-// ============================================================
-// PUSH NOTIFICATIONS (estrutura base)
-// ============================================================
-self.addEventListener('push', event => {
-  if (!event.data) return;
-  const data = event.data.json();
-  self.registration.showNotification(data.title || 'RitiFlix', {
-    body: data.body || 'Novo conteúdo disponível!',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    tag: 'ritiflix-notif',
-    renotify: true
-  });
-});
-
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  event.waitUntil(
-    clients.openWindow('/')
+        // Network fallback
+        return fetch(event.request).then(networkResponse => {
+          // Cache successful requests for fonts or third-party static CDNs
+          if (
+            networkResponse.status === 200 &&
+            (url.hostname.includes('fonts.gstatic.com') || url.hostname.includes('fonts.googleapis.com') || url.pathname.endsWith('.woff2') || url.pathname.endsWith('.woff'))
+          ) {
+            const responseCopy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseCopy));
+          }
+          return networkResponse;
+        }).catch(err => {
+          // If offline and requesting document, return cached index.html
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html') || caches.match('./');
+          }
+          throw err;
+        });
+      })
   );
+});
+
+// Message listener to trigger active updating
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
