@@ -2391,7 +2391,7 @@ async function salaHostPlay() {
   const epId = currentEpId || currentRoom.ep_id;
   if (!epId) { showNotif('⚠️ Nenhum episódio selecionado.', 'error'); return; }
   // Atualiza DB
-  sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).catch(()=>{});
+  try { await sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id); } catch(e) {}
   currentRoom.paused = false;
   renderSalaControls();
   // Broadcast IMEDIATO para membros — funciona tanto para vídeo nativo quanto iframe/superflix
@@ -2414,7 +2414,7 @@ async function salaHostPause() {
   // Pausa o player do proprio dono primeiro
   if (video) video.pause();
   // Atualiza DB
-  sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id).catch(()=>{});
+  try { await sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id); } catch(e) {}
   currentRoom.paused = true;
   renderSalaControls();
   // Broadcast imediato para todos
@@ -2441,17 +2441,17 @@ async function salaHostSyncNow() {
   }
 }
 
-function _hostLoadVideo() {
+async function _hostLoadVideo() {
   // Carrega o video no player do host
   if (!currentRoom || !currentRoom.isHost) return;
   currentRoom.paused = false;
   const epId = currentEpId || currentRoom.ep_id;
   if (!epId) return;
-  sb.from('episodes').select('video_url').eq('id', epId).single().then(({ data: ep }) => {
+  try {
+    const { data: ep } = await sb.from('episodes').select('video_url').eq('id', epId).single();
     if (!ep || !ep.video_url) return;
     // Prepara container — loadVideoUrl (e EmbedPlayer) já substituem o innerHTML do videoPlayer,
     // então só precisamos garantir que playerContent existe para o branch de vídeo direto.
-    // Para superflix/iframe, EmbedPlayer faz seu próprio innerHTML e ignora playerContent.
     const vpEl = document.getElementById('videoPlayer');
     if (vpEl && !document.getElementById('playerContent')) {
       vpEl.style.aspectRatio = '16/9';
@@ -2464,7 +2464,7 @@ function _hostLoadVideo() {
       const video = document.getElementById('animePlayer');
       if (video && _salaChannel) _broadcastSalaTime(video, true);
     }, 1000);
-  }).catch(()=>{});
+  } catch(e) { console.error('_hostLoadVideo:', e); }
 }
 
 // _memberSyncPlay: carrega o player do membro no tempo certo
@@ -3435,7 +3435,7 @@ function _wireRealPlayer(video, resumePct) {
       // Nota: o broadcast sala_play principal é feito por salaHostPlay().
       // Aqui fazemos apenas o time_sync para manter membros alinhados.
       _broadcastSalaTime(video, true);
-      sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).catch(()=>{});
+      try { await sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id); } catch(e) {}
     }
   });
 
@@ -3450,7 +3450,7 @@ function _wireRealPlayer(video, resumePct) {
       if (_salaChannel) _salaChannel.send({ type:'broadcast', event:'sala_pause',
         payload:{ t } }).catch(()=>{});
       _broadcastSalaTime(video, true);
-      sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id).catch(()=>{});
+      try { await sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id); } catch(e) {}
     }
   });
 
