@@ -2388,14 +2388,23 @@ function renderSalaControls() {
 
 async function salaHostPlay() {
   if (!currentRoom || !currentRoom.isHost) return;
-  // Atualiza DB (para novos entrantes e fallback postgres_changes)
+  const epId = currentEpId || currentRoom.ep_id;
+  if (!epId) { showNotif('⚠️ Nenhum episódio selecionado.', 'error'); return; }
+  // Atualiza DB
   sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).catch(()=>{});
   currentRoom.paused = false;
   renderSalaControls();
-  // Carrega e toca o video para o proprio dono.
-  // O broadcast sala_play é disparado automaticamente pelo evento 'play' do video em _wireRealPlayer.
+  // Broadcast IMEDIATO para membros — funciona tanto para vídeo nativo quanto iframe/superflix
+  // (para iframe não existe evento 'play' no <video>, então o broadcast deve ser feito aqui)
+  const videoNow = window._activeVideo || document.getElementById('animePlayer');
+  const tNow = videoNow ? videoNow.currentTime : 0;
+  if (_salaChannel) {
+    _salaChannel.send({ type:'broadcast', event:'sala_play',
+      payload:{ ep_id: epId, anime_id: currentAnimeId, t: tNow } }).catch(()=>{});
+  }
+  // Carrega o player do host
   _hostLoadVideo();
-  showNotif('▶ Liberando para todos…', 'success');
+  showNotif('▶ Play para todos!', 'success');
 }
 
 async function salaHostPause() {
@@ -2440,24 +2449,21 @@ function _hostLoadVideo() {
   if (!epId) return;
   sb.from('episodes').select('video_url').eq('id', epId).single().then(({ data: ep }) => {
     if (!ep || !ep.video_url) return;
-    // Garante que o container videoPlayer existe e está limpo antes de loadVideoUrl
+    // Prepara container — loadVideoUrl (e EmbedPlayer) já substituem o innerHTML do videoPlayer,
+    // então só precisamos garantir que playerContent existe para o branch de vídeo direto.
+    // Para superflix/iframe, EmbedPlayer faz seu próprio innerHTML e ignora playerContent.
     const vpEl = document.getElementById('videoPlayer');
-    if (vpEl) {
+    if (vpEl && !document.getElementById('playerContent')) {
       vpEl.style.aspectRatio = '16/9';
       vpEl.style.height = '';
-      // Cria playerContent dentro de videoPlayer se não existir
-      if (!document.getElementById('playerContent')) {
-        vpEl.innerHTML = '<div class="player-inner" id="playerContent"></div>';
-      }
+      vpEl.innerHTML = '<div class="player-inner" id="playerContent"></div>';
     }
     loadVideoUrl(ep.video_url, 0);
-    // Após carregar o player nativo, inicia sincronização periódica
+    // Para vídeo nativo: inicia sync periódico após carregar
     setTimeout(() => {
       const video = document.getElementById('animePlayer');
-      if (video && _salaChannel) {
-        _broadcastSalaTime(video, true);
-      }
-    }, 800);
+      if (video && _salaChannel) _broadcastSalaTime(video, true);
+    }, 1000);
   }).catch(()=>{});
 }
 
@@ -2465,36 +2471,43 @@ function _hostLoadVideo() {
 async function _memberSyncPlay(epId, hostTime) {
   showNotif('▶ O anfitrião iniciou o video!', 'success');
   if (!epId) return;
-  const video = document.getElementById('animePlayer');
-  if (video) {
-    // Player nativo ja esta carregado — apenas sincroniza posicao e da play
-    if (isFinite(hostTime) && Math.abs(video.currentTime - hostTime) > 1) {
-      video.currentTime = hostTime;
-    }
-    video.play().catch(()=>{});
-    return;
-  }
-  // Se ja existe um iframe embed, nao carrega de novo (iframe nao tem API de tempo)
-  const existingIframe = document.getElementById('iframeVideo');
-  if (existingIframe) return;
-  // Precisa carregar o video (membro ainda nao tinha player)
-  // Garante que playerContent existe para loadVideoUrl funcionar
-  const vpEl = document.getElementById('videoPlayer');
-  if (vpEl && !document.getElementById('playerContent')) {
-    vpEl.style.aspectRatio = '16/9';
-    vpEl.style.height = '';
-    vpEl.innerHTML = '<div class="player-inner" id="playerContent"></div>';
-  }
   try {
     const { data: ep } = await sb.from('episodes').select('video_url').eq('id', epId).single();
     if (!ep || !ep.video_url) return;
+    const videoUrl = ep.video_url;
+
+    // Verifica se já tem player nativo com o mesmo conteúdo → só sincroniza
+    const video = document.getElementById('animePlayer');
+    if (video) {
+      if (isFinite(hostTime) && Math.abs(video.currentTime - hostTime) > 1) {
+        video.currentTime = hostTime;
+      }
+      video.play().catch(()=>{});
+      return;
+    }
+
+    // Se já existe iframe → não recarrega (iframe não tem API de tempo)
+    const existingIframe = document.getElementById('iframeVideo');
+    if (existingIframe) return;
+
+    // Precisa carregar do zero — garante que playerContent existe para loadVideoUrl
+    const vpEl = document.getElementById('videoPlayer');
+    if (vpEl) {
+      vpEl.style.aspectRatio = '16/9';
+      vpEl.style.height = '';
+      if (!document.getElementById('playerContent')) {
+        vpEl.innerHTML = '<div class="player-inner" id="playerContent"></div>';
+      }
+    }
+
     window._memberTargetTime = hostTime || 0;
-    loadVideoUrl(ep.video_url, 0);
-    // Apos carregar: aplica tempo do host, lock de controles e da play
+    loadVideoUrl(videoUrl, 0);
+
+    // Para vídeo nativo: aguarda player aparecer no DOM e aplica seek + play
     const tryPlay = (attempt) => {
       const v = document.getElementById('animePlayer');
       if (!v) {
-        if (attempt < 15) setTimeout(() => tryPlay(attempt + 1), 200);
+        if (attempt < 20) setTimeout(() => tryPlay(attempt + 1), 200);
         return;
       }
       const wrap = document.getElementById('realPlayerWrap');
@@ -2507,7 +2520,7 @@ async function _memberSyncPlay(epId, hostTime) {
       if (v.readyState >= 1) { doPlay(); }
       else { v.addEventListener('loadedmetadata', doPlay, { once: true }); }
     };
-    setTimeout(() => tryPlay(0), 300);
+    setTimeout(() => tryPlay(0), 400);
   } catch(e) { console.error('_memberSyncPlay:', e); }
 }
 
@@ -3419,12 +3432,10 @@ function _wireRealPlayer(video, resumePct) {
     if (currentRoom && currentRoom.isHost) {
       currentRoom.paused = false;
       renderSalaControls();
-      const t = video.currentTime;
-      if (_salaChannel) _salaChannel.send({ type:'broadcast', event:'sala_play',
-        payload:{ ep_id: currentEpId, anime_id: currentAnimeId, t } }).catch(()=>{});
+      // Nota: o broadcast sala_play principal é feito por salaHostPlay().
+      // Aqui fazemos apenas o time_sync para manter membros alinhados.
       _broadcastSalaTime(video, true);
       sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).catch(()=>{});
-      showNotif('▶ Play para todos!', 'success');
     }
   });
 
