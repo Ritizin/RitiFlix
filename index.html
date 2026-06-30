@@ -614,11 +614,10 @@ input:focus~.search-kbd,.search-wrap input:focus~.search-kbd{opacity:0}
 .sala-status-badge{font-size:.72rem;padding:.25rem .6rem;border-radius:5px;font-weight:700;white-space:nowrap}
 .sala-status-live{color:#4ade80;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25)}
 .sala-status-paused{color:#fbbf24;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.25)}
-/* Player travado para membros da sala */
-#realPlayerWrap.sala-member-locked .rpbtn,
-#realPlayerWrap.sala-member-locked .rpc-bar,
-#realPlayerWrap.sala-member-locked .rpc-vol-slider{opacity:.45;pointer-events:none;cursor:not-allowed}
-#realPlayerWrap.sala-member-locked::after{content:'🔒 Controlado pelo anfitrião';position:absolute;bottom:3.5rem;left:50%;transform:translateX(-50%);background:rgba(7,9,15,.85);color:var(--text3);font-size:.72rem;padding:.3rem .75rem;border-radius:20px;white-space:nowrap;pointer-events:none;border:1px solid var(--border)}
+/* Player travado para membros */
+#realPlayerWrap.sala-member-locked .rpbtn{opacity:.35;pointer-events:none;cursor:not-allowed}
+#realPlayerWrap.sala-member-locked .rpc-bar{pointer-events:none;cursor:not-allowed;opacity:.5}
+#realPlayerWrap.sala-member-locked .rpc-vol-slider{pointer-events:none;opacity:.5}
 .sala-card-info .sc{font-size:.7rem;color:var(--text3);margin-top:.1rem}
 .sala-full-badge{font-size:.68rem;color:#f87171;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);padding:.2rem .5rem;border-radius:5px}
 @media(max-width:480px){
@@ -2248,41 +2247,46 @@ function subscribeSala(id) {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'salas', filter: 'id=eq.'+id }, payload => onSalaUpdate(payload.new))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'salas_mensagens', filter: 'sala_id=eq.'+id }, payload => appendSalaMsg(payload.new))
     .on('presence', { event: 'sync' }, () => updateSalaViewerCount())
-    // Broadcast de play/pause (fallback se postgres_changes não chegar)
+
+    // PLAY: dono liberou o video
     .on('broadcast', { event: 'sala_play' }, ({ payload }) => {
-      if (currentRoom && !currentRoom.isHost) {
-        currentRoom.paused = false;
-        renderSalaControls();
-        _memberApplyPlay(payload?.t);
-      }
+      if (!currentRoom || currentRoom.isHost) return;
+      currentRoom.paused = false;
+      renderSalaControls();
+      _memberSyncPlay(payload?.ep_id || currentRoom.ep_id, payload?.t ?? 0);
     })
+
+    // PAUSE: dono pausou
     .on('broadcast', { event: 'sala_pause' }, ({ payload }) => {
-      if (currentRoom && !currentRoom.isHost) {
-        currentRoom.paused = true;
-        renderSalaControls();
-        _memberApplyPause(payload?.t);
-      }
+      if (!currentRoom || currentRoom.isHost) return;
+      currentRoom.paused = true;
+      renderSalaControls();
+      _memberSyncPause(payload?.t);
     })
-    // Sincronização contínua de posição — só pra membros, com player de vídeo nativo (mp4/m3u8).
-    // O dono manda a posição atual a cada 2s; o membro ajusta se a diferença for grande.
+
+    // TIME SYNC: tick periodico do dono (a cada 2s)
     .on('broadcast', { event: 'sala_time_sync' }, ({ payload }) => {
       if (!currentRoom || currentRoom.isHost || !payload) return;
       const video = document.getElementById('animePlayer');
       if (!video) return;
-      // Compensa latência aproximada (metade do round-trip estimado)
-      const latency = payload.ts ? Math.min((Date.now() - payload.ts) / 1000, 3) : 0;
-      const targetTime = payload.paused ? payload.t : (payload.t + latency);
-      const drift = Math.abs(video.currentTime - targetTime);
-      // Sempre ajusta em seeks forçados ou drift > 1.5s
-      if (payload.forced || drift > 1.5) {
-        video.currentTime = targetTime;
-      }
-      // Sync play/pause
-      if (payload.paused && !video.paused) video.pause();
-      if (!payload.paused && video.paused) video.play().catch(()=>{});
-      // Atualiza indicador de sync
-      _updateSyncIndicator(drift);
+      const lag    = payload.ts ? Math.min((Date.now() - payload.ts) / 1000, 2) : 0;
+      const target = payload.paused ? payload.t : (payload.t + lag * 0.5);
+      const drift  = Math.abs(video.currentTime - target);
+      if (drift > 1.5) video.currentTime = target;
+      if (payload.paused && !video.paused)  video.pause();
+      if (!payload.paused && video.paused)  video.play().catch(()=>{});
+      // Atualiza indicador visual de sync
+      const dot = document.getElementById('salaSyncDot');
+      if (dot) dot.textContent = drift < 0.5 ? '🟢 Sincronizado' : drift < 3 ? '🟡 Sincronizando…' : '🔴 Dessincronizado';
     })
+
+    // SEEK: dono pulou para um ponto especifico
+    .on('broadcast', { event: 'sala_seek' }, ({ payload }) => {
+      if (!currentRoom || currentRoom.isHost || !payload) return;
+      const video = document.getElementById('animePlayer');
+      if (video && isFinite(payload.t)) video.currentTime = payload.t;
+    })
+
     .subscribe(status => {
       if (status === 'SUBSCRIBED' && currentUser) {
         _salaChannel.track({ username: currentUser.username });
@@ -2300,23 +2304,27 @@ function updateSalaViewerCount() {
 
 function onSalaUpdate(newRow) {
   if (!currentRoom || newRow.id !== currentRoom.id) return;
-  // Troca de título — só membros recebem (host já aplicou localmente)
+  // Troca de titulo — so membros recebem (host ja aplicou localmente)
   if (!currentRoom.isHost && (newRow.ep_id !== currentRoom.ep_id || newRow.anime_id !== currentRoom.anime_id)) {
     currentRoom.anime_id = newRow.anime_id;
     currentRoom.ep_id    = newRow.ep_id;
     showNotif('🔄 O anfitrião trocou o título da sala.', 'success');
     renderPlayer({ animeId: newRow.anime_id, epId: newRow.ep_id, salaId: newRow.id });
+    return;
   }
-  // Play / Pause via postgres_changes — só membros recebem
+  // Fallback: Play/Pause via postgres_changes (chega com ~1-2s de atraso)
+  // O broadcast ja chegou mais rapido, mas este serve de garantia
   if (!currentRoom.isHost && newRow.sala_paused !== undefined && newRow.sala_paused !== null) {
     const novoPaused = !!newRow.sala_paused;
     if (novoPaused !== currentRoom.paused) {
       currentRoom.paused = novoPaused;
       renderSalaControls();
       if (novoPaused) {
-        _memberApplyPause();
+        _memberSyncPause(null);  // sem tempo — apenas pausa
       } else {
-        _memberApplyPlay();
+        // Sem tempo exato aqui — o broadcast ja tratou; so garante play
+        const video = document.getElementById('animePlayer');
+        if (video && video.paused) video.play().catch(()=>{});
       }
     }
   }
@@ -2325,11 +2333,10 @@ function onSalaUpdate(newRow) {
 async function leaveSala(showMsg = true) {
   if (!currentRoom) return;
   if (window._salaSyncInterval) { clearInterval(window._salaSyncInterval); window._salaSyncInterval = null; }
-  // Remove lock do player se era membro
-  const wrap = document.getElementById('realPlayerWrap');
-  if (wrap) wrap.classList.remove('sala-member-locked');
-  document.removeEventListener('keydown', _memberKeyBlock, true);
-  // Decrementa contagem de membros para não-donos
+  // Remove lock do player ao sair da sala
+  const wrapLock = document.getElementById('realPlayerWrap');
+  if (wrapLock) wrapLock.classList.remove('sala-member-locked');
+  // Decrementa contagem de membros para nao-donos
   if (!currentRoom.isHost) {
     try {
       const { data: s } = await sb.from('salas').select('membros_count').eq('id', currentRoom.id).maybeSingle();
@@ -2346,55 +2353,6 @@ async function leaveSala(showMsg = true) {
   if (showMsg) { showNotif('👋 Você saiu da sala.', 'success'); navigate('salas'); }
 }
 
-// ── Bloqueia controles do player para membros (apenas o dono controla) ──
-function _lockMemberControls(video) {
-  if (!video) return;
-  // Adiciona classe CSS que opacifica e bloqueia os botões de controle
-  const wrap = document.getElementById('realPlayerWrap');
-  if (wrap) wrap.classList.add('sala-member-locked');
-  // Bloqueia clique nos botões do player
-  wrap?.addEventListener('click', _memberControlBlock, true);
-  wrap?.addEventListener('keydown', _memberControlBlock, true);
-  // Impede que o usuário use espaço/teclas para controlar
-  document.addEventListener('keydown', _memberKeyBlock, true);
-}
-
-function _memberKeyBlock(e) {
-  if (!currentRoom || currentRoom.isHost) { document.removeEventListener('keydown', _memberKeyBlock, true); return; }
-  // Bloqueia espaço (play/pause), setas (seek) no player
-  if (['Space','ArrowLeft','ArrowRight'].includes(e.code)) {
-    const focused = document.activeElement;
-    if (focused && focused.closest('#realPlayerWrap')) { e.stopPropagation(); e.preventDefault(); }
-  }
-}
-
-function _memberControlBlock(e) {
-  // Bloqueia os botões do player para membros da sala
-  if (!currentRoom || currentRoom.isHost) return;
-  const btn = e.target.closest('.rpbtn, .rpc-bar, .rpc-vol-slider');
-  if (btn) {
-    e.stopPropagation();
-    e.preventDefault();
-    showNotif('🔒 Apenas o anfitrião controla o player.', 'error');
-  }
-}
-
-// ── Indicador de sincronização nos membros ──
-function _updateSyncIndicator(drift) {
-  const el = document.getElementById('salaSyncIndicator');
-  if (!el) return;
-  if (drift < 0.5) {
-    el.textContent = '🟢 Sincronizado';
-    el.style.color = 'var(--gold)';
-  } else if (drift < 3) {
-    el.textContent = '🟡 Sincronizando…';
-    el.style.color = '#f0d070';
-  } else {
-    el.textContent = '🔴 Dessincronizado';
-    el.style.color = '#f87171';
-  }
-}
-
 // ── Controles de play/pause (host controla todos via Supabase Realtime) ──
 function renderSalaControls() {
   if (!currentRoom) return;
@@ -2405,23 +2363,21 @@ function renderSalaControls() {
   const bar = document.createElement('div');
   bar.id = 'salaCtrlBar';
   bar.className = 'sala-ctrl-bar';
+  const isPaused = currentRoom.paused !== false;
   if (currentRoom.isHost) {
-    const isPaused = currentRoom.paused !== false;
     bar.innerHTML = `
-      <span class="sala-ctrl-label">👑 Você é o anfitrião:</span>
+      <span class="sala-ctrl-label">👑 Anfitrião:</span>
       ${isPaused
-        ? `<button class="sala-ctrl-btn sala-ctrl-play"  onclick="salaHostPlay()">▶ Liberar para todos</button>`
+        ? `<button class="sala-ctrl-btn sala-ctrl-play" onclick="salaHostPlay()">▶ Liberar para todos</button>`
         : `<button class="sala-ctrl-btn sala-ctrl-pause" onclick="salaHostPause()">⏸ Pausar para todos</button>`
       }
-      <button class="sala-ctrl-btn" style="background:rgba(59,130,246,0.15);border-color:rgba(59,130,246,0.4);color:#60a5fa;font-size:.75rem;padding:.3rem .75rem" onclick="salaHostSyncNow()" title="Forçar sincronização de todos agora">🔄 Sincronizar agora</button>
-      <span class="sala-status-badge ${isPaused ? 'sala-status-paused' : 'sala-status-live'}">${isPaused ? '⏸ Pausado' : '▶ Ao vivo'}</span>
-      <span style="font-size:.72rem;color:var(--text3)">Os membros seguem você automaticamente.</span>`;
+      <button class="sala-ctrl-btn" style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);color:#93c5fd;font-size:.75rem;padding:.3rem .75rem" onclick="salaHostSyncNow()">🔄 Sincronizar</button>
+      <span class="sala-status-badge ${isPaused ? 'sala-status-paused' : 'sala-status-live'}">${isPaused ? '⏸ Pausado' : '▶ Ao vivo'}</span>`;
   } else {
-    const isPaused = currentRoom.paused !== false;
     bar.innerHTML = `
       <span class="sala-ctrl-label">Sala:</span>
       <span class="sala-status-badge ${isPaused ? 'sala-status-paused' : 'sala-status-live'}">${isPaused ? '⏸ Pausado pelo anfitrião' : '▶ Reproduzindo'}</span>
-      <span id="salaSyncIndicator" style="font-size:.72rem;color:var(--gold)">🟢 Sincronizado</span>
+      <span id="salaSyncDot" style="font-size:.72rem;color:var(--gold)">🟢 Sincronizado</span>
       <span style="font-size:.72rem;color:var(--text3)">🔒 Controlado pelo anfitrião</span>`;
   }
   topBar.insertAdjacentElement('afterend', bar);
@@ -2429,99 +2385,124 @@ function renderSalaControls() {
 
 async function salaHostPlay() {
   if (!currentRoom || !currentRoom.isHost) return;
-  try {
-    const { data, error } = await sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).select();
-    if (error) throw error;
-    if (!data || !data.length) { showNotif('❌ Não foi possível sincronizar (permissão do Supabase/RLS bloqueou a atualização).', 'error'); return; }
-    currentRoom.paused = false;
-    renderSalaControls();
-    // Carrega o vídeo também para o próprio dono se ainda não carregou
-    _hostLoadVideo();
-    const video = window._activeVideo;
-    const t = video ? video.currentTime : 0;
-    // Broadcast para membros via canal Realtime (fallback além do postgres_changes)
-    if (_salaChannel) {
-      _salaChannel.send({ type: 'broadcast', event: 'sala_play', payload: { ep_id: currentEpId, anime_id: currentAnimeId, t } }).catch(()=>{});
-    }
-    if (video) _broadcastSalaTime(video, true);
-    showNotif('▶ Play enviado para todos!', 'success');
-  } catch(e) { console.error('salaHostPlay:', e); showNotif('❌ Erro ao sincronizar.', 'error'); }
+  // Atualiza DB (para novos entrantes e fallback postgres_changes)
+  sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).catch(()=>{});
+  currentRoom.paused = false;
+  renderSalaControls();
+  const video = window._activeVideo;
+  const t = video ? video.currentTime : 0;
+  // Broadcast imediato para todos os membros conectados
+  if (_salaChannel) {
+    _salaChannel.send({ type:'broadcast', event:'sala_play',
+      payload:{ ep_id: currentEpId, anime_id: currentAnimeId, t } }).catch(()=>{});
+  }
+  // Carrega e toca o video para o proprio dono
+  _hostLoadVideo();
+  showNotif('▶ Play para todos!', 'success');
 }
 
 async function salaHostPause() {
   if (!currentRoom || !currentRoom.isHost) return;
-  try {
-    const { data, error } = await sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id).select();
-    if (error) throw error;
-    if (!data || !data.length) { showNotif('❌ Não foi possível sincronizar (permissão do Supabase/RLS bloqueou a atualização).', 'error'); return; }
-    currentRoom.paused = true;
-    renderSalaControls();
-    const video = window._activeVideo;
-    const t = video ? video.currentTime : 0;
-    // Broadcast de pause para membros via canal Realtime
-    if (_salaChannel) {
-      _salaChannel.send({ type: 'broadcast', event: 'sala_pause', payload: { t } }).catch(()=>{});
-    }
-    if (video) _broadcastSalaTime(video, true);
-    showNotif('⏸ Pausado para todos!', 'success');
-  } catch(e) { console.error('salaHostPause:', e); showNotif('❌ Erro ao sincronizar.', 'error'); }
+  const video = window._activeVideo;
+  const t = video ? video.currentTime : 0;
+  // Pausa o player do proprio dono primeiro
+  if (video) video.pause();
+  // Atualiza DB
+  sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id).catch(()=>{});
+  currentRoom.paused = true;
+  renderSalaControls();
+  // Broadcast imediato para todos
+  if (_salaChannel) {
+    _salaChannel.send({ type:'broadcast', event:'sala_pause', payload:{ t } }).catch(()=>{});
+  }
+  showNotif('⏸ Pausado para todos!', 'success');
 }
 
-// Força sincronização imediata de todos os membros com a posição atual do host
+// Forca sincronizacao imediata de todos com o tempo atual do host
 async function salaHostSyncNow() {
   if (!currentRoom || !currentRoom.isHost) return;
   const video = window._activeVideo;
   if (video) {
     _broadcastSalaTime(video, true);
-    showNotif('🔄 Sincronização enviada para todos!', 'success');
-  } else {
-    // Player embed — apenas garante estado de play/pause
-    const isPaused = currentRoom.paused !== false;
     if (_salaChannel) {
-      _salaChannel.send({ type: 'broadcast', event: isPaused ? 'sala_pause' : 'sala_play', payload: { t: 0 } }).catch(()=>{});
+      const ev = video.paused ? 'sala_pause' : 'sala_play';
+      _salaChannel.send({ type:'broadcast', event: ev,
+        payload:{ ep_id: currentEpId, anime_id: currentAnimeId, t: video.currentTime } }).catch(()=>{});
     }
-    showNotif('🔄 Comando enviado para todos!', 'success');
+    showNotif('🔄 Todos sincronizados no tempo ' + fmtTime(video.currentTime) + '!', 'success');
+  } else {
+    showNotif('⚠️ Player nao carregado. Clique em Play para todos primeiro.', 'error');
   }
 }
 
 function _hostLoadVideo() {
-  // Carrega o vídeo no player do host
+  // Carrega o video no player do host e dispara sincronizacao
   if (!currentRoom || !currentRoom.isHost) return;
-  currentRoom.paused = false; // marca como não-pausado para renderPlayer não bloquear
+  currentRoom.paused = false;
   const epId = currentEpId || currentRoom.ep_id;
   if (!epId) return;
   sb.from('episodes').select('video_url').eq('id', epId).single().then(({ data: ep }) => {
-    if (ep && ep.video_url) loadVideoUrl(ep.video_url, 0);
+    if (!ep || !ep.video_url) return;
+    loadVideoUrl(ep.video_url, 0);
+    // Apos carregar, manda sync com tempo=0 para membros
+    setTimeout(() => {
+      const video = document.getElementById('animePlayer');
+      if (video && _salaChannel) {
+        _salaChannel.send({ type:'broadcast', event:'sala_play',
+          payload:{ ep_id: epId, anime_id: currentAnimeId, t: 0 } }).catch(()=>{});
+      }
+    }, 800);
   }).catch(()=>{});
 }
 
-function _memberApplyPlay(hostTime) {
-  // Chamado quando o dono dá play — carrega/continua vídeo para o membro
-  showNotif('▶ O anfitrião deu play!', 'success');
-  const epId = currentEpId || currentRoom?.ep_id;
+// _memberSyncPlay: carrega o player do membro no tempo certo
+async function _memberSyncPlay(epId, hostTime) {
+  showNotif('▶ O anfitrião iniciou o video!', 'success');
+  if (!epId) return;
   const video = document.getElementById('animePlayer');
   if (video) {
-    // Player nativo já carregado — apenas dá play e sincroniza posição
-    if (hostTime != null) video.currentTime = hostTime;
+    // Player nativo ja esta carregado — apenas sincroniza posicao e da play
+    if (isFinite(hostTime) && Math.abs(video.currentTime - hostTime) > 1) {
+      video.currentTime = hostTime;
+    }
     video.play().catch(()=>{});
     return;
   }
-  if (!epId) return;
-  sb.from('episodes').select('video_url').eq('id', epId).single().then(({ data: ep }) => {
-    if (ep && ep.video_url) loadVideoUrl(ep.video_url, 0);
-  }).catch(()=>{});
+  // Precisa carregar o video (membro ainda nao tinha player)
+  try {
+    const { data: ep } = await sb.from('episodes').select('video_url').eq('id', epId).single();
+    if (!ep || !ep.video_url) return;
+    window._memberTargetTime = hostTime || 0;
+    loadVideoUrl(ep.video_url, 0);
+    // Apos carregar: aplica tempo do host, lock de controles e da play
+    setTimeout(() => {
+      const v = document.getElementById('animePlayer');
+      if (!v) return;
+      const t = window._memberTargetTime || 0;
+      const wrap = document.getElementById('realPlayerWrap');
+      if (wrap) wrap.classList.add('sala-member-locked');
+      const doPlay = () => {
+        if (t > 0 && isFinite(v.duration) && v.duration > 0) v.currentTime = Math.min(t, v.duration - 1);
+        v.play().catch(()=>{});
+      };
+      if (v.readyState >= 1) { doPlay(); }
+      else { v.addEventListener('loadedmetadata', doPlay, { once: true }); }
+    }, 300);
+  } catch(e) { console.error('_memberSyncPlay:', e); }
 }
 
-function _memberApplyPause(hostTime) {
-  // Chamado quando o dono pausa — pausa o player do membro também
+// _memberSyncPause: pausa o player do membro no tempo certo
+function _memberSyncPause(hostTime) {
   showNotif('⏸ O anfitrião pausou.', 'success');
   const video = document.getElementById('animePlayer');
   if (video) {
-    if (hostTime != null) video.currentTime = hostTime;
+    if (hostTime != null && isFinite(hostTime) && Math.abs(video.currentTime - hostTime) > 1) {
+      video.currentTime = hostTime;
+    }
     video.pause();
     return;
   }
-  // Embed (iframe) — mostra tela de espera
+  // Player embed ou nao carregado — mostra tela de espera
   const container = document.getElementById('videoPlayer');
   if (container) {
     container.style.aspectRatio = '16/9';
@@ -2530,7 +2511,7 @@ function _memberApplyPause(hostTime) {
       <div style="font-size:3rem;margin-bottom:.5rem">⏸</div>
       <div style="font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.4rem">Pausado pelo anfitrião</div>
       <div style="font-size:.82rem;color:var(--text3);text-align:center;max-width:320px;line-height:1.6">
-        Aguardando o dono dar <strong style="color:var(--gold)">▶ Play</strong> novamente.
+        Aguardando o anfitrião dar <strong style="color:var(--gold)">▶ Play</strong>.
       </div>
     </div>`;
   }
@@ -3358,15 +3339,8 @@ function loadVideoUrl(videoUrl, resumePct) {
 function _broadcastSalaTime(video, forced) {
   if (!currentRoom || !currentRoom.isHost || !_salaChannel || !video) return;
   _salaChannel.send({
-    type: 'broadcast',
-    event: 'sala_time_sync',
-    payload: {
-      t: video.currentTime,
-      paused: video.paused,
-      duration: video.duration || 0,
-      forced: !!forced,   // seek ou ação manual → força sync nos membros
-      ts: Date.now()      // timestamp do host para calcular latência
-    }
+    type: 'broadcast', event: 'sala_time_sync',
+    payload: { t: video.currentTime, paused: video.paused, ts: Date.now(), forced: !!forced }
   }).catch(()=>{});
 }
 
@@ -3415,37 +3389,41 @@ function _wireRealPlayer(video, resumePct) {
   video.addEventListener('play', () => {
     const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '⏸';
     if (currentRoom && currentRoom.isHost) {
-      // Host deu play → sincroniza imediatamente para todos
+      currentRoom.paused = false;
+      renderSalaControls();
+      const t = video.currentTime;
+      if (_salaChannel) _salaChannel.send({ type:'broadcast', event:'sala_play',
+        payload:{ ep_id: currentEpId, anime_id: currentAnimeId, t } }).catch(()=>{});
       _broadcastSalaTime(video, true);
-      if (_salaChannel) _salaChannel.send({ type:'broadcast', event:'sala_play', payload:{ ep_id: currentEpId, anime_id: currentAnimeId, t: video.currentTime } }).catch(()=>{});
-      // Atualiza DB para novos entrantes
-      sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).then(()=>{}).catch(()=>{});
-      currentRoom.paused = false; renderSalaControls();
+      sb.from('salas').update({ sala_paused: false }).eq('id', currentRoom.id).catch(()=>{});
     }
   });
+
   video.addEventListener('pause', () => {
     const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '▶';
     if (isFinite(video.duration) && video.duration > 0)
       saveWatchProgress((video.currentTime / video.duration) * 100, true);
     if (currentRoom && currentRoom.isHost) {
-      // Host pausou → sincroniza imediatamente para todos
+      currentRoom.paused = true;
+      renderSalaControls();
+      const t = video.currentTime;
+      if (_salaChannel) _salaChannel.send({ type:'broadcast', event:'sala_pause',
+        payload:{ t } }).catch(()=>{});
       _broadcastSalaTime(video, true);
-      if (_salaChannel) _salaChannel.send({ type:'broadcast', event:'sala_pause', payload:{ t: video.currentTime } }).catch(()=>{});
-      sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id).then(()=>{}).catch(()=>{});
-      currentRoom.paused = true; renderSalaControls();
+      sb.from('salas').update({ sala_paused: true }).eq('id', currentRoom.id).catch(()=>{});
     }
   });
+
   video.addEventListener('seeked', () => {
-    if (currentRoom && currentRoom.isHost) _broadcastSalaTime(video, true);  // seek força ajuste nos membros
+    if (currentRoom && currentRoom.isHost) {
+      // Seek isolado — manda evento dedicado alem do time_sync
+      if (_salaChannel) _salaChannel.send({ type:'broadcast', event:'sala_seek',
+        payload:{ t: video.currentTime } }).catch(()=>{});
+      _broadcastSalaTime(video, true);
+    }
   });
 
-  // ── Bloqueia controles para membros da sala ──
-  if (currentRoom && !currentRoom.isHost) {
-    _lockMemberControls(video);
-  }
-
-  // ── Sincronização de sala (player nativo) ──
-  // Host manda posição a cada 2s; membros ajustam se drift > 1.5s
+  // Sincronizacao continua: host manda posicao a cada 2s para membros ajustarem
   if (window._salaSyncInterval) { clearInterval(window._salaSyncInterval); window._salaSyncInterval = null; }
   if (currentRoom && currentRoom.isHost) {
     window._salaSyncInterval = setInterval(() => _broadcastSalaTime(video, false), 2000);
