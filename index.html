@@ -3277,7 +3277,7 @@ async function searchLive(q) {
   const results = animes.filter(a => a.title.toLowerCase().includes(q.toLowerCase())).slice(0,6);
   if (results.length === 0) { drop.classList.add('hidden'); return; }
   drop.innerHTML = results.map(a => `<div class="drop-item" onmousedown="navigate('detail',${a.id})">
-    <div class="drop-emoji">${a.emoji}</div>
+    <div class="drop-emoji">${a.poster ? `<img src="${a.poster}" style="width:32px;height:48px;object-fit:cover;border-radius:4px;display:block" onerror="this.outerHTML='${a.emoji||'🎬'}'">` : (a.emoji||'🎬')}</div>
     <div class="drop-info"><p>${sanitize(a.title)}</p><span>${a.year} • ${(a.genres||[])[0]||''}</span></div>
   </div>`).join('');
   drop.classList.remove('hidden');
