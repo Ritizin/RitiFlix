@@ -4658,12 +4658,45 @@ async function saveNewAnime() {
 // ------------------------------------------------------------
 // BOT DE CADASTRO — assistente em chat para adicionar filmes/séries/animes
 // ------------------------------------------------------------
-const botState = { step: 'idle', data: {} };
+const botState = { step: 'idle', data: {}, saveTimer: null };
 
-function renderAdminBot(el) {
+async function botLoadHistory() {
+  if (!currentUser) return [];
+  try {
+    const { data, error } = await sb.from('bot_chat_history').select('messages').eq('admin_id', currentUser.id).maybeSingle();
+    if (error || !data) return [];
+    return Array.isArray(data.messages) ? data.messages : [];
+  } catch (e) { return []; }
+}
+
+function botSaveHistory() {
+  if (!currentUser) return;
+  clearTimeout(botState.saveTimer);
+  botState.saveTimer = setTimeout(async () => {
+    try {
+      await sb.from('bot_chat_history').upsert({
+        admin_id: currentUser.id,
+        messages: botState.history,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'admin_id' });
+    } catch (e) { /* tabela pode não existir ainda — ignora silenciosamente */ }
+  }, 400);
+}
+
+async function botClearHistory() {
+  if (!currentUser) return;
+  if (!confirm('Apagar todo o histórico de conversa do bot para a sua conta de admin?')) return;
+  botState.history = [];
+  try { await sb.from('bot_chat_history').delete().eq('admin_id', currentUser.id); } catch (e) {}
+  document.getElementById('botMsgs').innerHTML = '';
+  botBotMsg('🧹 Histórico apagado. Vamos começar de novo — me diga o que quer adicionar.');
+}
+
+async function renderAdminBot(el) {
   el.innerHTML = `
   <div class="admin-header-bar">
     <div class="admin-page-title">🤖 Bot de Cadastro</div>
+    <button class="btn btn-ghost" onclick="botClearHistory()" style="font-size:.75rem">🧹 Limpar histórico</button>
   </div>
   <div class="bot-wrap">
     <div class="bot-msgs" id="botMsgs"></div>
@@ -4675,8 +4708,26 @@ function renderAdminBot(el) {
   botState.step = 'idle';
   botState.data = {};
   document.getElementById('botMsgs').innerHTML = '';
-  botBotMsg(`Olá! Eu sou o bot de cadastro do RitiFlix. 👋<br><br>Me diga o que quer adicionar — pode ser filme, série ou anime. Ex:<br>
-  <i>"adicionar Henry Danger com todas as temporadas"</i><br><i>"adicionar o filme Vingadores Ultimato"</i>`);
+
+  const history = await botLoadHistory();
+  botState.history = history.slice();
+  if (history.length) {
+    const box = document.getElementById('botMsgs');
+    history.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'bot-row' + (m.role === 'user' ? ' bot-user' : '');
+      row.innerHTML = `<div class="bot-avatar">${m.role === 'user' ? '👤' : '🤖'}</div><div class="bot-bubble">${m.html}</div>`;
+      box.appendChild(row);
+    });
+    const divider = document.createElement('div');
+    divider.style.cssText = 'text-align:center;font-size:.72rem;color:var(--text3);margin:.5rem 0';
+    divider.textContent = '— continuar conversa —';
+    box.appendChild(divider);
+    botScrollDown();
+  } else {
+    botBotMsg(`Olá! Eu sou o bot de cadastro do RitiFlix. 👋<br><br>Me diga o que quer adicionar — pode ser filme, série ou anime. Ex:<br>
+    <i>"adicionar Henry Danger com todas as temporadas"</i><br><i>"adicionar o filme Vingadores Ultimato"</i>`);
+  }
 }
 
 function botScrollDown() {
@@ -4692,6 +4743,9 @@ function botBotMsg(html) {
   row.innerHTML = `<div class="bot-avatar">🤖</div><div class="bot-bubble">${html}</div>`;
   box.appendChild(row);
   botScrollDown();
+  if (!botState.history) botState.history = [];
+  botState.history.push({ role: 'bot', html });
+  botSaveHistory();
   return row.querySelector('.bot-bubble');
 }
 
@@ -4703,6 +4757,9 @@ function botUserMsg(text) {
   row.innerHTML = `<div class="bot-avatar">👤</div><div class="bot-bubble">${sanitize(text)}</div>`;
   box.appendChild(row);
   botScrollDown();
+  if (!botState.history) botState.history = [];
+  botState.history.push({ role: 'user', html: sanitize(text) });
+  botSaveHistory();
 }
 
 function botOptions(options, handler) {
@@ -4906,7 +4963,7 @@ async function botHandleFembedLinks(text) {
   botTyping(true);
   const epData = await tmdbFetchSeasonEpisodes(d.tmdbId, season);
   botTyping(false);
-  const epCount = (epData && epData.episodes) ? epData.episodes.length : links.length;
+  const epCount = Array.isArray(epData) ? epData.length : links.length;
   d.fembedLinksBySeason[season] = links;
   if (links.length < epCount) {
     botBotMsg(`⚠️ A temporada ${season} tem ${epCount} episódios, mas você colou só ${links.length} link(s). Vou usar os que você mandou e deixar o resto sem link cadastrado (você pode completar depois em "Gerenciar Títulos"). Continuando...`);
@@ -4971,8 +5028,7 @@ async function botExecuteCreation() {
       const seasonsToAdd = d.wantAllSeasons ? seasonNumbers : seasonNumbers.slice(0, 1);
       let totalEps = 0;
       for (const sNum of seasonsToAdd) {
-        const seasonData = await tmdbFetchSeasonEpisodes(d.tmdbId, sNum);
-        const eps = (seasonData && seasonData.episodes) || [];
+        const eps = await tmdbFetchSeasonEpisodes(d.tmdbId, sNum);
         const rows = eps.map((ep, idx) => {
           const videoUrl = d.source === 'fembed'
             ? ((d.fembedLinksBySeason[sNum] || [])[idx] || '')
