@@ -3426,7 +3426,7 @@ function _wireRealPlayer(video, resumePct) {
     } catch(e){}
   });
 
-  video.addEventListener('play', () => {
+  video.addEventListener('play', async () => {
     const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '⏸';
     window._activeVideo = video;
     if (currentRoom && currentRoom.isHost) {
@@ -3439,7 +3439,7 @@ function _wireRealPlayer(video, resumePct) {
     }
   });
 
-  video.addEventListener('pause', () => {
+  video.addEventListener('pause', async () => {
     const b = document.getElementById('rpcPlayBtn'); if(b) b.textContent = '▶';
     if (isFinite(video.duration) && video.duration > 0)
       saveWatchProgress((video.currentTime / video.duration) * 100, true);
