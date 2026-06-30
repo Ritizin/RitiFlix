@@ -1607,6 +1607,17 @@ async function tmdbGetDetails(id, type) {
   return tmdbFetch('/'+type+'/'+id, { append_to_response:'credits,videos' });
 }
 
+// Busca "coleções" (franquias) no TMDb, ex: "Coleção Vingadores"
+async function tmdbSearchCollection(query) {
+  const data = await tmdbFetch('/search/collection', { query, page:1 });
+  return data.results || [];
+}
+
+// Detalhes de uma coleção do TMDb — retorna os filmes (parts) que a compõem
+async function tmdbGetCollectionDetails(id) {
+  return tmdbFetch('/collection/'+id, {});
+}
+
 function tmdbPosterUrl(path, hd=false) {
   if (!path) return '';
   return (hd ? TMDB_IMG_HD : TMDB_IMG) + path;
@@ -4701,7 +4712,7 @@ async function renderAdminBot(el) {
   <div class="bot-wrap">
     <div class="bot-msgs" id="botMsgs"></div>
     <div class="bot-input-bar">
-      <textarea id="botInput" placeholder="Ex: adicionar a série Henry Danger com todas as temporadas" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();botSend();}"></textarea>
+      <textarea id="botInput" placeholder="Ex: adicione todos os filmes dos vingadores" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();botSend();}"></textarea>
       <button class="btn btn-red" onclick="botSend()">Enviar</button>
     </div>
   </div>`;
@@ -4725,8 +4736,8 @@ async function renderAdminBot(el) {
     box.appendChild(divider);
     botScrollDown();
   } else {
-    botBotMsg(`Olá! Eu sou o bot de cadastro do RitiFlix. 👋<br><br>Me diga o que quer adicionar — pode ser filme, série ou anime. Ex:<br>
-    <i>"adicionar Henry Danger com todas as temporadas"</i><br><i>"adicionar o filme Vingadores Ultimato"</i>`);
+    botBotMsg(`Olá! Eu sou o bot de cadastro do RitiFlix. 👋<br><br>Me diga o que quer adicionar — pode ser filme, série, anime ou até uma <b>coleção inteira</b>. Ex:<br>
+    <i>"adicionar Henry Danger com todas as temporadas"</i><br><i>"adicionar o filme Vingadores Ultimato"</i><br><i>"adicione todos os filmes dos vingadores"</i>`);
   }
 }
 
@@ -4858,6 +4869,15 @@ async function botSend() {
 async function botHandleNewCommand(text) {
   botState.step = 'idle';
   botState.data = {};
+
+  // Detecta intenção de criar/popular uma COLEÇÃO (franquia), ex:
+  // "adicione todos os filmes dos vingadores", "criar coleção Velozes e Furiosos"
+  const collectionMatch = text.match(/(?:adicion[ae]r?\s+todos\s+os\s+filmes\s+(?:d[oae]s?|de)\s+|cri[ae]r?\s+(?:uma\s+)?cole[çc][ãa]o\s+(?:d[oae]s?|de|do)?\s*)(.+)/i);
+  if (collectionMatch && collectionMatch[1].trim()) {
+    await botHandleCollectionCommand(collectionMatch[1].trim());
+    return;
+  }
+
   // Remove palavras de comando comuns para isolar o nome do título
   let query = text
     .replace(/^(adicione|adicionar|adiciona|cadastre|cadastrar|inclua|incluir|coloque|colocar|quero adicionar|por favor adicione)\b/i, '')
@@ -5062,6 +5082,160 @@ async function botExecuteCreation() {
   }
 }
 
+
+// ------------------------------------------------------------
+// BOT — criação automática de COLEÇÃO (franquia), ex: "adicione todos
+// os filmes dos vingadores" / "criar coleção Velozes e Furiosos"
+// ------------------------------------------------------------
+async function botHandleCollectionCommand(query) {
+  botTyping(true);
+  try {
+    const results = await tmdbSearchCollection(query);
+    botTyping(false);
+    if (!results.length) {
+      botBotMsg(`Não encontrei nenhuma coleção no TMDb para <b>"${sanitize(query)}"</b>. Tente outro nome, ex: <i>"Vingadores"</i> ou <i>"Velozes e Furiosos"</i>.`);
+      return;
+    }
+    botBotMsg(`Encontrei estas coleções no TMDb para <b>"${sanitize(query)}"</b>. Qual delas?`);
+    botCollectionResultCards(results, (picked) => botHandleCollectionPicked(picked));
+  } catch (e) {
+    botTyping(false);
+    botBotMsg('❌ Tive um problema ao buscar a coleção no TMDb. Tente novamente em instantes.');
+  }
+}
+
+function botCollectionResultCards(results, handler) {
+  const box = document.getElementById('botMsgs');
+  const row = document.createElement('div');
+  row.className = 'bot-row';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;gap:.4rem;min-width:260px';
+  results.slice(0, 6).forEach(r => {
+    const poster = r.poster_path ? tmdbPosterUrl(r.poster_path) : '';
+    const card = document.createElement('div');
+    card.className = 'bot-result-card';
+    card.innerHTML = `${poster ? `<img src="${poster}">` : `<div style="width:38px;height:54px;border-radius:5px;background:var(--bg2);display:flex;align-items:center;justify-content:center">🎞️</div>`}
+      <div style="min-width:0"><div style="font-weight:700;font-size:.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sanitize(r.name || '(sem nome)')}</div>
+      <div style="font-size:.72rem;color:var(--text3)">🎞️ Coleção</div></div>`;
+    card.onclick = () => {
+      wrap.querySelectorAll('.bot-result-card').forEach(c => c.style.pointerEvents = 'none');
+      wrap.style.opacity = '.5';
+      botUserMsg(r.name);
+      handler(r);
+    };
+    wrap.appendChild(card);
+  });
+  row.innerHTML = `<div class="bot-avatar">🤖</div>`;
+  row.appendChild(wrap);
+  box.appendChild(row);
+  botScrollDown();
+}
+
+async function botHandleCollectionPicked(picked) {
+  botTyping(true);
+  let details;
+  try {
+    details = await tmdbGetCollectionDetails(picked.id);
+  } catch (e) {
+    botTyping(false);
+    botBotMsg('❌ Não consegui carregar os detalhes dessa coleção no TMDb.');
+    return;
+  }
+  botTyping(false);
+  const parts = (details.parts || [])
+    .filter(p => p.release_date) // só filmes já lançados/com data
+    .sort((a, b) => (a.release_date || '').localeCompare(b.release_date || ''));
+  if (!parts.length) {
+    botBotMsg('Essa coleção não tem filmes com data de lançamento cadastrada no TMDb. Não há nada para adicionar.');
+    return;
+  }
+  botState.data.collection = { id: details.id, name: details.name, parts };
+  const listHtml = parts.map(p => `• ${sanitize(p.title)} (${(p.release_date || '').slice(0, 4)})`).join('<br>');
+  botBotMsg(`📦 A coleção <b>${sanitize(details.name)}</b> tem ${parts.length} filme(s):<br><br>${listHtml}<br><br>Quer adicionar todos eles ao catálogo, criando a coleção <b>"${sanitize(details.name)}"</b>?`);
+  botOptions([
+    { label: '✅ Adicionar todos', value: 'all' },
+    { label: '❌ Cancelar', value: 'cancel' },
+  ], (val) => {
+    if (val === 'cancel') { botReset('Ok, cancelado. Me diga se quiser fazer outra coisa.'); return; }
+    botAskCollectionSource();
+  });
+}
+
+function botAskCollectionSource() {
+  botBotMsg('Qual fonte de link de embed devo usar para <b>todos</b> os filmes dessa coleção? Você seleciona uma vez e eu aplico em todos.');
+  botOptions([
+    { label: 'Superflix', value: 'superflix' },
+    { label: 'Superflix2', value: 'superflix2' },
+    { label: 'MyEmbed', value: 'myembed' },
+  ], (val) => {
+    botState.data.source = val;
+    botExecuteCollectionCreation();
+  });
+}
+
+async function botExecuteCollectionCreation() {
+  const d = botState.data;
+  const col = d.collection;
+  const source = d.source;
+  botBotMsg(`⏳ Beleza, vou cadastrar os ${col.parts.length} filme(s) da coleção <b>${sanitize(col.name)}</b> agora. Isso pode levar um tempinho...`);
+  botTyping(true);
+  let added = 0, skipped = 0, failed = 0;
+  const skippedTitles = [];
+  try {
+    for (const part of col.parts) {
+      try {
+        // Evita duplicar título já cadastrado
+        const { data: existing } = await sb.from('animes').select('id').eq('title', sanitize(part.title)).maybeSingle();
+        if (existing) { skipped++; skippedTitles.push(part.title); continue; }
+
+        const details = await tmdbGetDetails(part.id, 'movie');
+        const poster = details.poster_path ? tmdbPosterUrl(details.poster_path, true) : '';
+        const backdrop = details.backdrop_path ? tmdbPosterUrl(details.backdrop_path, true) : '';
+        const year = parseInt((details.release_date || '').slice(0, 4)) || 2024;
+        const genres = (details.genres || []).map(g => g.name);
+
+        const { data: animeRows, error: animeErr } = await sb.from('animes').insert({
+          title: sanitize(details.title),
+          type: 'filme',
+          emoji: '🎬',
+          poster: poster,
+          banner_url: backdrop || null,
+          description: sanitize(details.overview || ''),
+          status: 'Completo',
+          episodes: 1,
+          year: year,
+          score: details.vote_average ? Math.round(details.vote_average * 10) / 10 : 8.0,
+          genres: genres,
+          collection: sanitize(col.name),
+          featured: false, is_new: true, popular: false, trending: false, recommended: false,
+        }).select('id');
+        if (animeErr) throw animeErr;
+        const animeId = animeRows[0].id;
+
+        const videoUrl = botVideoUrl(source, part.id, true);
+        await sb.from('episodes').insert({
+          anime_id: animeId, num: 1, title: sanitize(details.title),
+          duration: details.runtime ? `${String(Math.floor(details.runtime/60)).padStart(2,'0')}:${String(details.runtime%60).padStart(2,'0')}:00` : '01:45:00',
+          thumbnail_url: backdrop || '', season: 1, video_url: videoUrl,
+        });
+        added++;
+      } catch (innerErr) {
+        failed++;
+      }
+    }
+    botTyping(false);
+    let summary = `✅ Coleção <b>${sanitize(col.name)}</b> processada!<br><br>📥 ${added} filme(s) adicionado(s)`;
+    if (skipped) summary += `<br>⏭️ ${skipped} já existia(m) no catálogo e foram pulados (${skippedTitles.slice(0,5).map(sanitize).join(', ')}${skippedTitles.length>5?'...':''})`;
+    if (failed) summary += `<br>⚠️ ${failed} falharam ao salvar`;
+    summary += `<br><br>Todos foram marcados com a coleção <b>"${sanitize(col.name)}"</b>, então já aparecem juntos na página de detalhes. Quer adicionar outra coleção ou título? 🎬`;
+    botBotMsg(summary);
+  } catch (e) {
+    botTyping(false);
+    botBotMsg('❌ Deu erro ao processar a coleção: ' + sanitize(e.message || String(e)));
+  } finally {
+    botState.step = 'idle'; botState.data = {};
+  }
+}
 
 async function renderAdminMovieVideo(el, animeId) {
   const { data: anime } = await sb.from('animes').select('*').eq('id', animeId).single();
