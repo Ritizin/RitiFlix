@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>RitiFlix</title>
+<script>
+  // Truque padrão para SPA em GitHub Pages Project Sites.
+  // O GitHub Pages serve este arquivo quando a URL não bate com nenhuma
+  // pasta física (ex: /RitiFlix/titulo/123 ou /RitiFlix/assistir/123/1).
+  // Aqui a gente guarda o caminho pedido e redireciona pro app de verdade,
+  // que restaura a URL certinha via history.replaceState (veja router.js).
+  var base = '/RitiFlix';
+  var path = location.pathname;
+  if (path.indexOf(base) === 0) path = path.slice(base.length);
+  path = path.replace(/^\/+/, '');
+  var query = location.search.replace(/^\?/, '');
+  var url = base + '/?rfpath=' + encodeURIComponent(path) + (query ? '&rfquery=' + encodeURIComponent(query) : '');
+  location.replace(url + location.hash);
+</script>
+</head>
+<body>
+  Redirecionando…
+</body>
+</html>
